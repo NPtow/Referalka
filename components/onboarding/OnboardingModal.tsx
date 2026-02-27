@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Step1Companies from "./Step1Companies";
 import Step2Resume from "./Step2Resume";
 import Step3RoleExp from "./Step3RoleExp";
@@ -24,6 +25,7 @@ export interface OnboardingData {
 const STEPS = ["Компании", "Ссылки", "Роль", "Карточка"];
 
 export default function OnboardingModal({ userId, firstName, onClose }: Props) {
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<OnboardingData>({
     companies: [],
@@ -99,7 +101,10 @@ export default function OnboardingModal({ userId, firstName, onClose }: Props) {
               firstName={firstName}
               data={data}
               profileId={profileId}
-              onClose={onClose}
+              onClose={() => {
+                onClose();
+                router.push("/profile");
+              }}
             />
           )}
         </div>

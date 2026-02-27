@@ -1,8 +1,17 @@
 "use client";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
+import { getUser } from "@/lib/auth";
 
 export default function Hero() {
+  const [hasProfile, setHasProfile] = useState(false);
+
+  useEffect(() => {
+    const u = getUser();
+    if (u?.profile) setHasProfile(true);
+  }, []);
+
   const scrollToReg = () => {
     document.getElementById("registration")?.scrollIntoView({ behavior: "smooth" });
   };
@@ -23,9 +32,15 @@ export default function Hero() {
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
-        <Button size="lg" onClick={scrollToReg}>
-          Получить реферал →
-        </Button>
+        {hasProfile ? (
+          <Link href="/profile">
+            <Button size="lg">Открыть мой профиль →</Button>
+          </Link>
+        ) : (
+          <Button size="lg" onClick={scrollToReg}>
+            Получить реферал →
+          </Button>
+        )}
         <Link
           href="/referrer"
           className="text-sm font-medium text-gray-500 hover:text-[#1863e5] transition-colors px-4 py-2"

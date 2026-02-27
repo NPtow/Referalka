@@ -1,11 +1,19 @@
 "use client";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Button from "@/components/ui/Button";
+import { getUser } from "@/lib/auth";
 
 export default function Navbar() {
   const pathname = usePathname();
   const isHome = pathname === "/";
+  const [user, setUser] = useState<{ firstName: string } | null>(null);
+
+  useEffect(() => {
+    const u = getUser();
+    if (u) setUser(u);
+  }, []);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
@@ -42,7 +50,17 @@ export default function Navbar() {
               Цены
             </button>
           )}
-          {isHome ? (
+          {user ? (
+            <Link
+              href="/profile"
+              className="flex items-center gap-2 text-sm font-semibold text-[#171923] hover:text-[#1863e5] transition-colors"
+            >
+              <span className="w-8 h-8 rounded-full bg-[#1863e5] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                {user.firstName[0]}
+              </span>
+              Профиль
+            </Link>
+          ) : isHome ? (
             <Button size="sm" onClick={() => document.getElementById("registration")?.scrollIntoView({ behavior: "smooth" })}>
               Начать
             </Button>
