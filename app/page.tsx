@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import Navbar from "@/components/Navbar";
 import Hero from "@/components/sections/Hero";
 import CompaniesStrip from "@/components/sections/CompaniesStrip";
 import HowItWorks from "@/components/sections/HowItWorks";
@@ -11,6 +10,7 @@ import Pricing from "@/components/sections/Pricing";
 import FAQ from "@/components/sections/FAQ";
 import Footer from "@/components/sections/Footer";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
+import { saveUser } from "@/lib/auth";
 
 interface AuthedUser {
   id: number;
@@ -23,6 +23,7 @@ export default function Home() {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const handleAuth = (authedUser: AuthedUser) => {
+    saveUser(authedUser);
     setUser(authedUser);
     if (!authedUser.profile) {
       setShowOnboarding(true);
@@ -31,7 +32,6 @@ export default function Home() {
 
   return (
     <>
-      <Navbar />
       <main>
         <Hero />
         <CompaniesStrip />

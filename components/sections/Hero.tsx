@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import Button from "@/components/ui/Button";
 
 export default function Hero() {
@@ -25,12 +26,12 @@ export default function Hero() {
         <Button size="lg" onClick={scrollToReg}>
           Получить реферал →
         </Button>
-        <button
-          onClick={scrollToReg}
+        <Link
+          href="/referrer"
           className="text-sm font-medium text-gray-500 hover:text-[#1863e5] transition-colors px-4 py-2"
         >
           Стать реферером
-        </button>
+        </Link>
       </div>
 
       {/* notification previews */}

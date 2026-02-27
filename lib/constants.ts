@@ -1,3 +1,151 @@
+export interface CompanyMeta {
+  name: string;
+  slug: string;
+  description: string;
+  size: string;
+  tags: string[];
+  logoPath: string | null;
+  website: string;
+}
+
+export const COMPANIES_META: CompanyMeta[] = [
+  {
+    name: "Яндекс",
+    slug: "yandex",
+    description: "Крупнейшая российская IT-компания: поиск, рекомендательные сервисы, такси, маркетплейс, облако и многое другое.",
+    size: "20 000+ сотрудников",
+    tags: ["IT", "Медиа"],
+    logoPath: "/logos/yandex.svg",
+    website: "https://yandex.ru",
+  },
+  {
+    name: "Тинькофф",
+    slug: "tinkoff",
+    description: "Технологический банк и финансовая экосистема. Один из крупнейших работодателей в финтехе в России.",
+    size: "30 000+ сотрудников",
+    tags: ["IT", "Финтех"],
+    logoPath: "/logos/tinkoff.svg",
+    website: "https://tinkoff.ru",
+  },
+  {
+    name: "Озон",
+    slug: "ozon",
+    description: "Один из крупнейших маркетплейсов России. Активно развивают логистику, финтех и облачные сервисы.",
+    size: "50 000+ сотрудников",
+    tags: ["IT", "E-commerce"],
+    logoPath: "/logos/ozon.svg",
+    website: "https://ozon.ru",
+  },
+  {
+    name: "Авито",
+    slug: "avito",
+    description: "Крупнейшая платформа объявлений в России. Развивают маркетплейс, финансовые продукты и технологии.",
+    size: "5 000+ сотрудников",
+    tags: ["IT", "E-commerce"],
+    logoPath: "/logos/avito.svg",
+    website: "https://avito.ru",
+  },
+  {
+    name: "Сбер",
+    slug: "sber",
+    description: "Крупнейший банк и технологическая экосистема России. Инвестируют в AI, ML и цифровые сервисы.",
+    size: "300 000+ сотрудников",
+    tags: ["IT", "Финтех"],
+    logoPath: "/logos/sber.svg",
+    website: "https://sber.ru",
+  },
+  {
+    name: "ВКонтакте",
+    slug: "vk",
+    description: "Крупнейшая социальная сеть России. Развивают экосистему из мессенджеров, игр, музыки и видео.",
+    size: "10 000+ сотрудников",
+    tags: ["IT", "Медиа"],
+    logoPath: "/logos/vk.svg",
+    website: "https://vk.com",
+  },
+  {
+    name: "Kaspersky",
+    slug: "kaspersky",
+    description: "Мировой лидер в сфере кибербезопасности. Разрабатывают антивирусные и корпоративные решения.",
+    size: "5 000+ сотрудников",
+    tags: ["IT"],
+    logoPath: "/logos/kaspersky.svg",
+    website: "https://kaspersky.ru",
+  },
+  {
+    name: "2GIS",
+    slug: "2gis",
+    description: "Картографический сервис и городской справочник. Используется в 500+ городах мира.",
+    size: "3 000+ сотрудников",
+    tags: ["IT"],
+    logoPath: "/logos/2gis.svg",
+    website: "https://2gis.ru",
+  },
+  {
+    name: "Lamoda",
+    slug: "lamoda",
+    description: "Крупнейший fashion-маркетплейс России. Продают одежду, обувь и аксессуары с быстрой доставкой.",
+    size: "10 000+ сотрудников",
+    tags: ["IT", "E-commerce"],
+    logoPath: "/logos/lamoda.svg",
+    website: "https://lamoda.ru",
+  },
+  {
+    name: "Циан",
+    slug: "cian",
+    description: "Крупнейшая платформа для поиска недвижимости в России. Помогают миллионам найти дом или офис.",
+    size: "1 500+ сотрудников",
+    tags: ["IT"],
+    logoPath: null,
+    website: "https://cian.ru",
+  },
+  {
+    name: "HeadHunter",
+    slug: "hh",
+    description: "Ведущая платформа для поиска работы в России. Ежедневно соединяют миллионы кандидатов и работодателей.",
+    size: "2 000+ сотрудников",
+    tags: ["IT"],
+    logoPath: "/logos/hh.svg",
+    website: "https://hh.ru",
+  },
+  {
+    name: "Wildberries",
+    slug: "wildberries",
+    description: "Крупнейший маркетплейс России по обороту. Активно развивают технологическую платформу и логистику.",
+    size: "100 000+ сотрудников",
+    tags: ["IT", "E-commerce"],
+    logoPath: "/logos/wildberries.svg",
+    website: "https://wildberries.ru",
+  },
+  {
+    name: "МТС",
+    slug: "mts",
+    description: "Крупнейший телеком-оператор России. Активно трансформируются в IT-компанию: финтех, облако, AI.",
+    size: "70 000+ сотрудников",
+    tags: ["IT", "Финтех"],
+    logoPath: "/logos/mts.svg",
+    website: "https://mts.ru",
+  },
+  {
+    name: "Ростелеком",
+    slug: "rostelecom",
+    description: "Национальный телекоммуникационный провайдер. Развивают облачные и цифровые сервисы для бизнеса.",
+    size: "130 000+ сотрудников",
+    tags: ["IT"],
+    logoPath: null,
+    website: "https://rostelecom.ru",
+  },
+  {
+    name: "Дзен",
+    slug: "dzen",
+    description: "Платформа персонализированного контента. Используют ML и рекомендательные алгоритмы для подбора материалов.",
+    size: "1 000+ сотрудников",
+    tags: ["IT", "Медиа"],
+    logoPath: null,
+    website: "https://dzen.ru",
+  },
+];
+
 export const COMPANIES = [
   "Яндекс",
   "Тинькофф",

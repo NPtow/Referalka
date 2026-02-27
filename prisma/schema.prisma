@@ -8,12 +8,13 @@ datasource db {
 }
 
 model User {
-  id        Int      @id
+  id        Int       @id
   username  String?
   firstName String
   photoUrl  String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   profile   Profile?
+  referrer  Referrer?
 }
 
 model Profile {
@@ -26,9 +27,39 @@ model Profile {
   linkedinUrl String?
   githubUrl   String?
   siteUrl     String?
-  isPro       Boolean  @default(false)
-  referrals   Int      @default(0)
+  isPro            Boolean  @default(false)
+  referrals        Int      @default(0)
+  bio              String?
+  isPublic         Boolean  @default(false)
+  openToRelocation Boolean  @default(false)
+  location         String?
+  resumeText       String?
+  summary          String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id])
+}
+
+model Referrer {
+  id          String   @id @default(cuid())
+  userId      Int      @unique
+  company     String
+  linkedinUrl String?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model Vacancy {
+  id          String   @id @default(cuid())
+  companySlug String
+  title       String
+  level       String
+  type        String
+  tags        String[]
+  salary      String?
+  isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([companySlug])
 }
