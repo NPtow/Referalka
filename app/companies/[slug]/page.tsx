@@ -24,7 +24,7 @@ const LEVEL_FILTER = ["Все", "junior", "middle", "senior"];
 const TYPE_LABELS: Record<string, string> = { remote: "Удалённо", office: "Офис", hybrid: "Гибрид" };
 const LEVEL_LABELS: Record<string, string> = { junior: "Junior", middle: "Middle", senior: "Senior" };
 
-type ModalState = null | "auth" | "onboarding" | "success";
+type ModalState = null | "auth" | "onboarding" | "payment" | "success";
 
 export default function CompanyPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -57,7 +57,7 @@ export default function CompanyPage() {
     } else if (!currentUser.profile) {
       setModal("onboarding");
     } else {
-      setModal("success");
+      setModal("payment");
     }
   };
 
@@ -67,7 +67,7 @@ export default function CompanyPage() {
     if (!authedUser.profile) {
       setModal("onboarding");
     } else {
-      setModal("success");
+      setModal("payment");
     }
   };
 
@@ -205,6 +205,37 @@ export default function CompanyPage() {
           firstName={user.firstName}
           onClose={() => setModal(null)}
         />
+      )}
+      {modal === "payment" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-8 text-center">
+            <div className="text-4xl mb-3">💳</div>
+            <h3 className="text-xl font-black text-[#171923] mb-2" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
+              Запрос реферала
+            </h3>
+            <p className="font-semibold text-[#171923] mb-4">
+              {selectedVacancy?.title} · {company.name}
+            </p>
+            <div className="bg-[#FFF8E1] border border-[#F6E05E] rounded-xl p-4 mb-5 text-left">
+              <p className="text-sm font-semibold text-[#744210] mb-1">🧪 Бета-тестирование</p>
+              <p className="text-sm text-[#92400E]">
+                Сейчас мы работаем в ручном режиме. После подтверждения заявки с вами свяжется наш менеджер в Telegram и объяснит следующие шаги.
+              </p>
+            </div>
+            <button
+              onClick={() => setModal("success")}
+              className="w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors mb-3"
+            >
+              Подтвердить заявку →
+            </button>
+            <button
+              onClick={() => setModal(null)}
+              className="text-sm text-[#A0AEC0] hover:text-[#718096] transition-colors"
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
       )}
       {modal === "success" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
