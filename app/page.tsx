@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/sections/Hero";
+import CompaniesStrip from "@/components/sections/CompaniesStrip";
 import HowItWorks from "@/components/sections/HowItWorks";
 import ForWhom from "@/components/sections/ForWhom";
 import CandidateFeed from "@/components/sections/CandidateFeed";
@@ -33,6 +34,7 @@ export default function Home() {
       <Navbar />
       <main>
         <Hero />
+        <CompaniesStrip />
         <HowItWorks />
         <ForWhom />
         <CandidateFeed />
