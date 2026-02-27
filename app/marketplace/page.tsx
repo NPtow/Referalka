@@ -20,6 +20,11 @@ export default function MarketplacePage() {
   const [expMax, setExpMax] = useState(15);
   const [selected, setSelected] = useState<Candidate | null>(null);
 
+  const handleViewCandidate = (c: Candidate) => {
+    setSelected(c);
+    fetch(`/api/profile/${c.id}/view`, { method: "POST" });
+  };
+
   const fetchCandidates = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -153,7 +158,7 @@ export default function MarketplacePage() {
             {!loading && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {candidates.map((c) => (
-                  <MarketplaceCard key={c.id} candidate={c} onView={setSelected} />
+                  <MarketplaceCard key={c.id} candidate={c} onView={handleViewCandidate} />
                 ))}
               </div>
             )}

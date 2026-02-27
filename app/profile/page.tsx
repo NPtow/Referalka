@@ -20,6 +20,7 @@ interface ProfileData {
   openToRelocation: boolean;
   location: string | null;
   resumeText: string | null;
+  _count?: { views: number };
   user: {
     firstName: string;
     username: string | null;
@@ -211,7 +212,7 @@ export default function ProfilePage() {
                 {profile.user.firstName[0]}
               </div>
             )}
-            <div>
+            <div className="flex-1">
               <h1 className="text-xl font-black text-[#171923]" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
                 {profile.user.firstName}
               </h1>
@@ -219,6 +220,12 @@ export default function ProfilePage() {
                 <p className="text-sm text-[#A0AEC0]">@{profile.user.username}</p>
               )}
             </div>
+            {(profile._count?.views ?? 0) > 0 && (
+              <div className="text-right flex-shrink-0">
+                <p className="text-2xl font-black text-[#171923]">{profile._count!.views}</p>
+                <p className="text-xs text-[#A0AEC0]">просмотров</p>
+              </div>
+            )}
           </div>
         </div>
 

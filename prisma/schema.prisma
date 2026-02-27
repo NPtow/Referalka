@@ -38,6 +38,16 @@ model Profile {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id])
+  views            ProfileView[]
+}
+
+model ProfileView {
+  id        String   @id @default(cuid())
+  profileId String
+  viewedAt  DateTime @default(now())
+  profile   Profile  @relation(fields: [profileId], references: [id])
+
+  @@index([profileId])
 }
 
 model Referrer {

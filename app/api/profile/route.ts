@@ -25,7 +25,10 @@ export async function GET(req: NextRequest) {
 
   const profile = await prisma.profile.findUnique({
     where: { userId: Number(userId) },
-    include: { user: { select: { firstName: true, username: true, photoUrl: true } } },
+    include: {
+      user: { select: { firstName: true, username: true, photoUrl: true } },
+      _count: { select: { views: true } },
+    },
   });
 
   if (!profile) return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -57,6 +57,23 @@ export default function Step4Card({ firstName, data, profileId, onClose }: Props
       <Button className="w-full" onClick={onClose}>
         Отлично, жду реферала!
       </Button>
+
+      <div className="mt-4 bg-[#EBF4FF] rounded-xl px-4 py-3 text-left">
+        <p className="text-xs font-semibold text-[#1863e5] mb-0.5">Включи уведомления</p>
+        <p className="text-xs text-[#4A5568]">
+          Чтобы знать, когда реферер просмотрел твой профиль — напиши{" "}
+          <span className="font-mono font-semibold">/start</span>{" "}
+          боту{" "}
+          <a
+            href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME ?? "referalocka_bot"}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#1863e5] hover:underline font-medium"
+          >
+            @{process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME ?? "referalocka_bot"}
+          </a>
+        </p>
+      </div>
     </div>
   );
 }
