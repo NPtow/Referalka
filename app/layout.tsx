@@ -15,8 +15,8 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Рефералочка — реферал в топовую IT-компанию",
-  description: "Получи реферал от реального сотрудника Яндекса, Тинькофф, Озона и 50+ других компаний. Первый реферал бесплатно.",
+  title: "Рефералка — реферал в топовую IT-компанию",
+  description: "Получи реферал от реального сотрудника Яндекса, Тинькофф, Озона и 50+ других компаний.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

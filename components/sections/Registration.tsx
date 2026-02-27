@@ -49,7 +49,7 @@ export default function Registration({ onAuth }: Props) {
           Начни прямо сейчас
         </h2>
         <p className="text-[#718096] mb-10">
-          Зарегистрируйся через Telegram и получи первый реферал бесплатно
+          Зарегистрируйся через Telegram и найди реферера в компанию мечты
         </p>
         <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
           <div className="flex justify-center" ref={containerRef} />

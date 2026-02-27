@@ -18,7 +18,7 @@ export default function Step4Card({ firstName, data, profileId, onClose }: Props
         Карточка создана, {firstName}!
       </h3>
       <p className="text-sm text-[#718096] mb-6">
-        Твой первый реферал бесплатно — ищем реферера в выбранных компаниях
+        Ищем реферера в выбранных компаниях — мы уведомим тебя как только найдём
       </p>
 
       {/* превью карточки */}
