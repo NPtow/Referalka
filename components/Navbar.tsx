@@ -147,6 +147,21 @@ export default function Navbar() {
             )}
           </div>
 
+          {/* For You */}
+          <Link
+            href="/for-you"
+            className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors font-medium ${
+              pathname.startsWith("/for-you")
+                ? "text-[#1863e5] font-semibold"
+                : "text-gray-500 hover:text-[#171923]"
+            }`}
+          >
+            Для тебя
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#1863e5] to-[#7C3AED] text-white leading-none">
+              New
+            </span>
+          </Link>
+
           {isHome && (
             <button
               className="text-sm text-gray-500 hover:text-[#171923] transition-colors px-3 py-1.5"
