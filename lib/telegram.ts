@@ -41,5 +41,6 @@ export function verifyTelegramAuth(data: TelegramUser): boolean {
 
   const isValid = hmac === hash;
   const isRecent = Date.now() / 1000 - rest.auth_date < 86400;
+  console.log("[TG Auth] HMAC match:", isValid, "| isRecent:", isRecent, "| computed:", hmac, "| received:", hash);
   return isValid && isRecent;
 }
