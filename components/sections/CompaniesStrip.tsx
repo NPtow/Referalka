@@ -33,8 +33,12 @@ export default function CompaniesStrip() {
       </p>
       <div className="flex gap-8 animate-marquee whitespace-nowrap">
         {doubled.map((c, i) => (
-          <div key={i} className="inline-flex flex-col items-center gap-2 min-w-[68px]">
-            <div className="w-11 h-11 rounded-xl bg-white border border-gray-100 shadow-sm flex items-center justify-center overflow-hidden">
+          <button
+            key={i}
+            className="inline-flex flex-col items-center gap-2 min-w-[68px] cursor-pointer group"
+            onClick={() => document.getElementById("registration")?.scrollIntoView({ behavior: "smooth" })}
+          >
+            <div className="w-11 h-11 rounded-xl bg-white border border-gray-100 shadow-sm flex items-center justify-center overflow-hidden group-hover:border-[#1863e5] group-hover:shadow-md transition-all">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={faviconUrl(c.domain)}
@@ -44,8 +48,8 @@ export default function CompaniesStrip() {
                 className="object-contain"
               />
             </div>
-            <span className="text-xs text-gray-400">{c.name}</span>
-          </div>
+            <span className="text-xs text-gray-400 group-hover:text-[#1863e5] transition-colors">{c.name}</span>
+          </button>
         ))}
       </div>
     </section>

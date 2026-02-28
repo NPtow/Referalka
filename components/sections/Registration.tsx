@@ -14,17 +14,29 @@ declare global {
 
 export default function Registration({ onAuth }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const onAuthRef = useRef(onAuth);
   const botName = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME ?? "referalocka_bot";
+
+  // Keep ref up-to-date without triggering script recreation
+  onAuthRef.current = onAuth;
 
   useEffect(() => {
     window.onTelegramAuth = async (tgUser: TelegramUser) => {
-      const res = await fetch("/api/auth/telegram", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(tgUser),
-      });
-      const json = await res.json();
-      if (json.user) onAuth({ id: json.user.id, firstName: json.user.firstName, profile: json.user.profile ?? null });
+      try {
+        const res = await fetch("/api/auth/telegram", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(tgUser),
+        });
+        const json = await res.json();
+        if (json.user) {
+          onAuthRef.current({ id: json.user.id, firstName: json.user.firstName, profile: json.user.profile ?? null });
+        } else {
+          console.error("Telegram auth failed:", json);
+        }
+      } catch (err) {
+        console.error("Telegram auth error:", err);
+      }
     };
 
     const script = document.createElement("script");
@@ -40,7 +52,8 @@ export default function Registration({ onAuth }: Props) {
       containerRef.current.innerHTML = "";
       containerRef.current.appendChild(script);
     }
-  }, [botName, onAuth]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [botName]); // only recreate script when botName changes
 
   return (
     <section id="registration" className="py-20 px-4 bg-[#F7FAFC]">

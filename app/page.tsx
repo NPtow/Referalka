@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Hero from "@/components/sections/Hero";
 import CompaniesStrip from "@/components/sections/CompaniesStrip";
@@ -11,7 +11,7 @@ import Pricing from "@/components/sections/Pricing";
 import FAQ from "@/components/sections/FAQ";
 import Footer from "@/components/sections/Footer";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
-import { saveUser, getUser } from "@/lib/auth";
+import { saveUser } from "@/lib/auth";
 
 interface AuthedUser {
   id: number;
@@ -23,16 +23,6 @@ export default function Home() {
   const router = useRouter();
   const [user, setUser] = useState<AuthedUser | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
-
-  useEffect(() => {
-    const u = getUser();
-    if (u?.profile) {
-      router.push("/companies");
-    } else if (u && !u.profile) {
-      setUser(u as AuthedUser);
-      setShowOnboarding(true);
-    }
-  }, [router]);
 
   const handleAuth = (authedUser: AuthedUser) => {
     saveUser(authedUser);
