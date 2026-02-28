@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 
 const COMPANIES = [
   { name: "Яндекс",      domain: "yandex.ru" },
@@ -25,6 +26,7 @@ function faviconUrl(domain: string) {
 
 export default function CompaniesStrip() {
   const doubled = [...COMPANIES, ...COMPANIES];
+  const router = useRouter();
 
   return (
     <section className="bg-[#F7FAFC] border-b border-gray-100 py-10 overflow-hidden">
@@ -36,7 +38,7 @@ export default function CompaniesStrip() {
           <button
             key={i}
             className="inline-flex flex-col items-center gap-2 min-w-[68px] cursor-pointer group"
-            onClick={() => document.getElementById("registration")?.scrollIntoView({ behavior: "smooth" })}
+            onClick={() => router.push("/companies")}
           >
             <div className="w-11 h-11 rounded-xl bg-white border border-gray-100 shadow-sm flex items-center justify-center overflow-hidden group-hover:border-[#1863e5] group-hover:shadow-md transition-all">
               {/* eslint-disable-next-line @next/next/no-img-element */}
