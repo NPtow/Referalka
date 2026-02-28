@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Hero from "@/components/sections/Hero";
 import CompaniesStrip from "@/components/sections/CompaniesStrip";
 import HowItWorks from "@/components/sections/HowItWorks";
@@ -20,7 +19,6 @@ interface AuthedUser {
 }
 
 export default function Home() {
-  const router = useRouter();
   const [user, setUser] = useState<AuthedUser | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -29,8 +27,6 @@ export default function Home() {
     setUser(authedUser);
     if (!authedUser.profile) {
       setShowOnboarding(true);
-    } else {
-      router.push("/companies");
     }
   };
 
