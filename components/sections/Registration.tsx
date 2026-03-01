@@ -1,53 +1,23 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { TelegramUser } from "@/lib/telegram";
+import { useEffect, useRef } from "react";
 
+// Props kept for API compatibility but onAuth is now handled via redirect+cookie in page.tsx
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface Props {
   onAuth: (user: { id: number; firstName: string; profile: unknown | null }) => void;
 }
 
-declare global {
-  interface Window {
-    onTelegramAuth: (user: TelegramUser) => void;
-  }
-}
-
-export default function Registration({ onAuth }: Props) {
+export default function Registration(_props: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const onAuthRef = useRef(onAuth);
   const botName = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME ?? "referalocka_bot";
-  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
-
-  onAuthRef.current = onAuth;
 
   useEffect(() => {
-    window.onTelegramAuth = async (tgUser: TelegramUser) => {
-      setStatus("loading");
-      try {
-        const res = await fetch("/api/auth/telegram", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(tgUser),
-        });
-        const json = await res.json();
-        if (res.ok && json.user) {
-          onAuthRef.current({ id: json.user.id, firstName: json.user.firstName, profile: json.user.profile ?? null });
-        } else {
-          console.error("Telegram auth failed:", json);
-          setStatus("error");
-        }
-      } catch (err) {
-        console.error("Telegram auth error:", err);
-        setStatus("error");
-      }
-    };
-
     const script = document.createElement("script");
     script.src = "https://telegram.org/js/telegram-widget.js?22";
     script.setAttribute("data-telegram-login", botName);
     script.setAttribute("data-size", "large");
     script.setAttribute("data-radius", "12");
-    script.setAttribute("data-onauth", "onTelegramAuth(user)");
+    script.setAttribute("data-auth-url", `${window.location.origin}/api/auth/telegram/callback`);
     script.setAttribute("data-request-access", "write");
     script.async = true;
 
@@ -57,22 +27,6 @@ export default function Registration({ onAuth }: Props) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botName]);
-
-  const handleRetry = () => {
-    setStatus("idle");
-    if (containerRef.current) {
-      containerRef.current.innerHTML = "";
-      const script = document.createElement("script");
-      script.src = "https://telegram.org/js/telegram-widget.js?22";
-      script.setAttribute("data-telegram-login", botName);
-      script.setAttribute("data-size", "large");
-      script.setAttribute("data-radius", "12");
-      script.setAttribute("data-onauth", "onTelegramAuth(user)");
-      script.setAttribute("data-request-access", "write");
-      script.async = true;
-      containerRef.current.appendChild(script);
-    }
-  };
 
   return (
     <section id="registration" className="py-20 px-4 bg-[#F7FAFC]">
@@ -84,23 +38,7 @@ export default function Registration({ onAuth }: Props) {
           Зарегистрируйся через Telegram и найди реферера в компанию мечты
         </p>
         <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
-          {status === "loading" ? (
-            <div className="py-4 text-[#718096] text-sm">
-              Входим через Telegram...
-            </div>
-          ) : status === "error" ? (
-            <div className="py-4 flex flex-col items-center gap-3">
-              <p className="text-red-500 text-sm font-medium">Что-то пошло не так. Попробуй ещё раз.</p>
-              <button
-                onClick={handleRetry}
-                className="text-sm text-[#1863e5] hover:underline font-medium"
-              >
-                Попробовать снова
-              </button>
-            </div>
-          ) : (
-            <div className="flex justify-center" ref={containerRef} />
-          )}
+          <div className="flex justify-center" ref={containerRef} />
           <p className="text-xs text-[#A0AEC0] mt-4">
             Мы не храним лишнего. Только имя и username из Telegram
           </p>

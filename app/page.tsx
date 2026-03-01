@@ -1,10 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Hero from "@/components/sections/Hero";
 import CompaniesStrip from "@/components/sections/CompaniesStrip";
 import HowItWorks from "@/components/sections/HowItWorks";
 import ForWhom from "@/components/sections/ForWhom";
-import CandidateFeed from "@/components/sections/CandidateFeed";
 import Registration from "@/components/sections/Registration";
 import Pricing from "@/components/sections/Pricing";
 import FAQ from "@/components/sections/FAQ";
@@ -30,6 +29,20 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("auth_success")) {
+      const raw = document.cookie.split(";").find((c) => c.trim().startsWith("tg_auth="));
+      if (raw) {
+        const userData = JSON.parse(decodeURIComponent(raw.split("=").slice(1).join("=")));
+        handleAuth(userData);
+        document.cookie = "tg_auth=; path=/; max-age=0";
+      }
+      window.history.replaceState({}, "", "/");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <>
       <main>
@@ -37,7 +50,6 @@ export default function Home() {
         <CompaniesStrip />
         <HowItWorks />
         <ForWhom />
-        <CandidateFeed />
         <Registration onAuth={handleAuth} />
         <div id="pricing">
           <Pricing />
