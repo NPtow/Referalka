@@ -1,28 +1,64 @@
 "use client";
 import { useEffect, useRef } from "react";
 
+interface TelegramUser {
+  id: number;
+  first_name: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
+}
+
 interface Props {
   onAuth: (user: { id: number; firstName: string; profile: unknown | null }) => void;
 }
 
-export default function Registration(_props: Props) {
+export default function Registration({ onAuth }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const onAuthRef = useRef(onAuth);
+  onAuthRef.current = onAuth;
 
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Определяем глобальный колбэк ДО загрузки скрипта
+    (window as unknown as Record<string, unknown>).onTelegramAuth = async (user: TelegramUser) => {
+      try {
+        const res = await fetch("/api/auth/telegram", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(user),
+        });
+        const data = await res.json();
+        if (data.user) {
+          onAuthRef.current({
+            id: data.user.id,
+            firstName: data.user.firstName,
+            profile: data.user.profile ?? null,
+          });
+        }
+      } catch (err) {
+        console.error("[TG Auth] callback error:", err);
+      }
+    };
+
     containerRef.current.innerHTML = "";
 
     const script = document.createElement("script");
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.src = "https://telegram.org/js/telegram-widget.js?23";
     script.setAttribute("data-telegram-login", "referalkaaaa_bot");
     script.setAttribute("data-size", "large");
     script.setAttribute("data-radius", "12");
-    script.setAttribute("data-auth-url", `${window.location.origin}/api/auth/telegram/callback`);
+    script.setAttribute("data-onauth", "onTelegramAuth(user)");
     script.setAttribute("data-request-access", "write");
     script.async = true;
 
     containerRef.current.appendChild(script);
+
+    return () => {
+      delete (window as unknown as Record<string, unknown>).onTelegramAuth;
+    };
   }, []);
 
   return (
