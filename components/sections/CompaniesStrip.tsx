@@ -1,31 +1,13 @@
 "use client";
 import { useRouter } from "next/navigation";
-
-const COMPANIES = [
-  { name: "Яндекс",      domain: "yandex.ru" },
-  { name: "Тинькофф",   domain: "tinkoff.ru" },
-  { name: "Озон",        domain: "ozon.ru" },
-  { name: "Авито",       domain: "avito.ru" },
-  { name: "ВКонтакте",  domain: "vk.com" },
-  { name: "Сбер",        domain: "sber.ru" },
-  { name: "Wildberries", domain: "wildberries.ru" },
-  { name: "Касперский",  domain: "kaspersky.ru" },
-  { name: "МТС",         domain: "mts.ru" },
-  { name: "HeadHunter",  domain: "hh.ru" },
-  { name: "2ГИС",        domain: "2gis.ru" },
-  { name: "Skyeng",      domain: "skyeng.ru" },
-  { name: "Selectel",    domain: "selectel.ru" },
-  { name: "Lamoda",      domain: "lamoda.ru" },
-  { name: "Самокат",     domain: "samokat.ru" },
-  { name: "Positive",    domain: "ptsecurity.com" },
-];
+import { COMPANIES_META } from "@/lib/constants";
 
 function faviconUrl(domain: string) {
   return `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=128`;
 }
 
 export default function CompaniesStrip() {
-  const doubled = [...COMPANIES, ...COMPANIES];
+  const doubled = [...COMPANIES_META, ...COMPANIES_META];
   const router = useRouter();
 
   return (

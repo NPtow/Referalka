@@ -127,14 +127,24 @@ export default function CompanyPage() {
               </div>
               <p className="text-sm text-[#A0AEC0] mb-2">{company.size}</p>
               <p className="text-sm text-[#718096] mb-3">{company.description}</p>
-              <a
-                href={company.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-[#1863e5] hover:underline"
-              >
-                {company.website} ↗
-              </a>
+              <div className="flex gap-4 flex-wrap">
+                <a
+                  href={company.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-[#1863e5] hover:underline"
+                >
+                  {company.website} ↗
+                </a>
+                <a
+                  href={company.vacancyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-white bg-[#1863e5] hover:bg-[#1251c0] px-3 py-1 rounded-lg transition-colors"
+                >
+                  Смотреть вакансии ↗
+                </a>
+              </div>
             </div>
           </div>
         </div>
