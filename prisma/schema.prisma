@@ -59,6 +59,13 @@ model Referrer {
   user        User     @relation(fields: [userId], references: [id])
 }
 
+model PendingAuth {
+  token     String   @id @default(uuid())
+  userId    Int?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
 model Vacancy {
   id          String   @id @default(cuid())
   companySlug String
