@@ -189,17 +189,6 @@ export const COMPANIES_META: CompanyMeta[] = [
     vacancyUrl: "https://www.jetbrains.com/ru-ru/careers",
   },
   {
-    name: "Miro",
-    slug: "miro",
-    domain: "miro.com",
-    description: "Платформа для визуальной совместной работы. Используется командами по всему миру.",
-    size: "2 000+ сотрудников",
-    tags: ["IT"],
-    logoPath: "/logos/miro.png",
-    website: "https://miro.com",
-    vacancyUrl: "https://miro.com/careers",
-  },
-  {
     name: "Wrike",
     slug: "wrike",
     domain: "wrike.com",
