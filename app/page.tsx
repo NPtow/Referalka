@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Hero from "@/components/sections/Hero";
 import CompaniesStrip from "@/components/sections/CompaniesStrip";
 import HowItWorks from "@/components/sections/HowItWorks";
@@ -28,20 +28,6 @@ export default function Home() {
       setShowOnboarding(true);
     }
   };
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("auth_success")) {
-      const raw = document.cookie.split(";").find((c) => c.trim().startsWith("tg_auth="));
-      if (raw) {
-        const userData = JSON.parse(decodeURIComponent(raw.split("=").slice(1).join("=")));
-        handleAuth(userData);
-        document.cookie = "tg_auth=; path=/; max-age=0";
-      }
-      window.history.replaceState({}, "", "/");
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <>
