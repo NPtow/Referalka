@@ -44,16 +44,6 @@ export default function Pricing() {
   return (
     <section className="py-20 px-4 bg-[#F7FAFC]">
       <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-14">
-          <h2
-            className="text-3xl md:text-4xl font-black text-[#171923] mb-3"
-            style={{ fontFamily: "'Inter Tight', sans-serif" }}
-          >
-            Твоя карьера стоит инвестиций
-          </h2>
-
-        </div>
-
         <div className="grid md:grid-cols-2 gap-6">
           {plans.map((p) => (
             <div

@@ -12,6 +12,7 @@ export default function Registration({ onAuth }: Props) {
   const statusRef = useRef<Status>("idle");
   const tokenRef = useRef<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onAuthRef = useRef(onAuth);
   onAuthRef.current = onAuth;
 
@@ -20,31 +21,19 @@ export default function Registration({ onAuth }: Props) {
     setStatus(s);
   };
 
-  // Pre-fetch a token on mount so the button is ready immediately
-  useEffect(() => {
-    fetch("/api/auth/telegram/init")
-      .then((r) => r.json())
-      .then((data) => {
-        tokenRef.current = data.token;
-      })
-      .catch(() => {});
-  }, []);
-
-  // Cleanup polling on unmount
+  // Cleanup polling and timeout on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
   async function handleLogin() {
-    // Get token (fetch a new one if the prefetched one is missing)
-    let token = tokenRef.current;
-    if (!token) {
-      const data = await fetch("/api/auth/telegram/init").then((r) => r.json());
-      token = data.token as string;
-      tokenRef.current = token;
-    }
+    // Always fetch a fresh token — pre-fetched tokens expire in 5 min and become stale
+    const data = await fetch("/api/auth/telegram/init").then((r) => r.json());
+    const token = data.token as string;
+    tokenRef.current = token;
 
     // Open bot link
     window.open(`https://t.me/referalkaaaa_bot?start=login_${token}`, "_blank");
@@ -71,13 +60,15 @@ export default function Registration({ onAuth }: Props) {
       }
     }, 2000);
 
-    // Stop polling after 5 minutes (use statusRef to avoid stale closure)
-    setTimeout(() => {
+    // Stop polling after 5 minutes — cancel previous timeout to avoid conflicts
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
         if (statusRef.current === "waiting") updateStatus("idle");
       }
+      timeoutRef.current = null;
     }, 5 * 60 * 1000);
   }
 
@@ -118,11 +109,9 @@ export default function Registration({ onAuth }: Props) {
               <button
                 onClick={() => {
                   if (intervalRef.current) clearInterval(intervalRef.current);
+                  if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
                   updateStatus("idle");
                   tokenRef.current = null;
-                  fetch("/api/auth/telegram/init")
-                    .then((r) => r.json())
-                    .then((d) => { tokenRef.current = d.token; });
                 }}
                 className="mt-4 text-xs text-[#A0AEC0] underline"
               >
