@@ -6,7 +6,6 @@ import CompaniesStrip from "@/components/sections/CompaniesStrip";
 import HowItWorks from "@/components/sections/HowItWorks";
 import ForWhom from "@/components/sections/ForWhom";
 import Registration from "@/components/sections/Registration";
-import Pricing from "@/components/sections/Pricing";
 import FAQ from "@/components/sections/FAQ";
 import Footer from "@/components/sections/Footer";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
@@ -63,9 +62,6 @@ export default function Home() {
         ) : (
           <Registration onAuth={handleAuth} />
         )}
-        <div id="pricing">
-          <Pricing />
-        </div>
         <FAQ />
       </main>
       <Footer />
