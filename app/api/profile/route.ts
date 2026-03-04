@@ -35,6 +35,23 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ profile });
 }
 
+export async function DELETE(req: NextRequest) {
+  const { userId } = await req.json();
+  if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
+
+  const uid = Number(userId);
+
+  const profile = await prisma.profile.findUnique({ where: { userId: uid } });
+  if (profile) {
+    await prisma.profileView.deleteMany({ where: { profileId: profile.id } });
+    await prisma.profile.delete({ where: { userId: uid } });
+  }
+  await prisma.pendingAuth.deleteMany({ where: { userId: uid } });
+  await prisma.user.delete({ where: { id: uid } });
+
+  return NextResponse.json({ ok: true });
+}
+
 export async function PATCH(req: NextRequest) {
   const { userId, bio, location, openToRelocation, isPublic, resumeText } = await req.json();
   if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
