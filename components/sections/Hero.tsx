@@ -22,7 +22,7 @@ export default function Hero() {
         className="text-4xl md:text-6xl font-black text-[#171923] max-w-3xl leading-tight mb-5"
         style={{ fontFamily: "'Inter Tight', Inter, sans-serif" }}
       >
-        <span className="text-[#1863e5]">Реферал в топовую IT-компанию</span>{" "}
+        <span className="text-[#1863e5]">Реферал в топовую компанию</span>{" "}
         от реального сотрудника.
       </h1>
 
