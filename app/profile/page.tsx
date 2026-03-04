@@ -306,6 +306,41 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
+          <div className="mt-5 pt-4 border-t border-gray-100 flex gap-2">
+            <button
+              onClick={handleLogout}
+              className="flex-1 py-2 rounded-xl border border-gray-200 text-sm font-medium text-[#4A5568] hover:bg-[#F7FAFC] transition-colors"
+            >
+              Выйти
+            </button>
+            {!confirmDelete ? (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="flex-1 py-2 rounded-xl border border-red-200 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+              >
+                Удалить аккаунт
+              </button>
+            ) : (
+              <div className="flex-1 rounded-xl border border-red-200 bg-red-50 p-3">
+                <p className="text-xs font-medium text-red-700 mb-2">Удалить аккаунт навсегда?</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="flex-1 py-1.5 rounded-lg border border-gray-200 bg-white text-xs text-[#4A5568] hover:bg-gray-50 transition-colors"
+                  >
+                    Отмена
+                  </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleting}
+                    className="flex-1 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-xs font-semibold text-white transition-colors disabled:opacity-60"
+                  >
+                    {deleting ? "Удаляю..." : "Да, удалить"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Base profile (readonly) */}
@@ -459,44 +494,6 @@ export default function ProfilePage() {
           </p>
         )}
 
-        {/* Account actions */}
-        <div className="mt-10 border-t border-gray-200 pt-6 flex flex-col gap-3">
-          <button
-            onClick={handleLogout}
-            className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-[#4A5568] hover:bg-[#F7FAFC] transition-colors"
-          >
-            Выйти из аккаунта
-          </button>
-
-          {!confirmDelete ? (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="w-full py-2.5 rounded-xl border border-red-200 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
-            >
-              Удалить профиль
-            </button>
-          ) : (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-              <p className="text-sm font-medium text-red-700 mb-1">Ты уверен?</p>
-              <p className="text-xs text-red-500 mb-4">Это действие необратимо — все данные будут удалены</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="flex-1 py-2 rounded-lg border border-gray-200 bg-white text-sm text-[#4A5568] hover:bg-gray-50 transition-colors"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={handleDeleteAccount}
-                  disabled={deleting}
-                  className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-sm font-semibold text-white transition-colors disabled:opacity-60"
-                >
-                  {deleting ? "Удаляю..." : "Да, удалить"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );
