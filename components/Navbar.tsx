@@ -10,6 +10,7 @@ export default function Navbar() {
   const isHome = pathname === "/";
   const [user, setUser] = useState<{ firstName: string } | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const isReferralsActive =
@@ -19,6 +20,17 @@ export default function Navbar() {
     const u = getUser();
     if (u) setUser(u);
   }, []);
+
+  // Close mobile menu on navigation
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -41,7 +53,19 @@ export default function Navbar() {
           Рефералка
         </Link>
 
-        <div className="flex items-center gap-3">
+        {/* Burger button — mobile only */}
+        <button
+          className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg text-[#171923] hover:bg-gray-100 transition-colors"
+          onClick={() => setMobileMenuOpen(true)}
+          aria-label="Открыть меню"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
+        {/* Desktop navigation — hidden on mobile */}
+        <div className="hidden md:flex items-center gap-3">
           {/* Referrals dropdown */}
           <div className="relative" ref={dropdownRef}>
             <button
@@ -162,17 +186,6 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {isHome && (
-            <button
-              className="text-sm text-gray-500 hover:text-[#171923] transition-colors px-3 py-1.5"
-              onClick={() =>
-                document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })
-              }
-            >
-              Цены
-            </button>
-          )}
-
           {user ? (
             <Link
               href="/profile"
@@ -197,6 +210,118 @@ export default function Navbar() {
               <Button size="sm">Начать</Button>
             </Link>
           )}
+        </div>
+      </div>
+
+      {/* Mobile menu overlay */}
+      <div
+        className={`fixed inset-0 z-50 md:hidden transition-opacity duration-300 ${
+          mobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/20"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+
+        {/* Menu panel */}
+        <div
+          className={`absolute top-0 right-0 h-full w-full max-w-sm bg-white shadow-xl transition-transform duration-300 ${
+            mobileMenuOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 h-16 border-b border-gray-200">
+            <span
+              className="text-[#171923] font-black text-lg"
+              style={{ fontFamily: "'Inter Tight', sans-serif" }}
+            >
+              Рефералка
+            </span>
+            <button
+              className="flex items-center justify-center w-10 h-10 rounded-lg text-[#171923] hover:bg-gray-100 transition-colors"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Закрыть меню"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Links */}
+          <div className="px-4 py-4 flex flex-col gap-1">
+            <Link
+              href="/companies"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`text-base font-medium px-3 py-3 rounded-xl transition-colors ${
+                pathname.startsWith("/companies")
+                  ? "text-[#1863e5] bg-[#EBF4FF]"
+                  : "text-[#171923] hover:bg-gray-50"
+              }`}
+            >
+              Запросить реферал
+            </Link>
+
+            <Link
+              href="/marketplace"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`text-base font-medium px-3 py-3 rounded-xl transition-colors ${
+                pathname.startsWith("/marketplace")
+                  ? "text-[#1863e5] bg-[#EBF4FF]"
+                  : "text-[#171923] hover:bg-gray-50"
+              }`}
+            >
+              Маркетплейс рефереров
+            </Link>
+
+            <Link
+              href="/for-you"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center gap-2 text-base font-medium px-3 py-3 rounded-xl transition-colors ${
+                pathname.startsWith("/for-you")
+                  ? "text-[#1863e5] bg-[#EBF4FF]"
+                  : "text-[#171923] hover:bg-gray-50"
+              }`}
+            >
+              Для тебя
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#1863e5] to-[#7C3AED] text-white leading-none">
+                New
+              </span>
+            </Link>
+
+            {/* Divider */}
+            <div className="h-px bg-gray-200 my-2" />
+
+            {/* Profile / CTA */}
+            {user ? (
+              <Link
+                href="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                <span className="w-9 h-9 rounded-full bg-[#1863e5] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                  {user.firstName[0]}
+                </span>
+                <span className="text-base font-semibold text-[#171923]">{user.firstName}</span>
+              </Link>
+            ) : isHome ? (
+              <button
+                className="mt-2"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  document.getElementById("registration")?.scrollIntoView({ behavior: "smooth" });
+                }}
+              >
+                <Button size="sm" className="w-full">Начать</Button>
+              </button>
+            ) : (
+              <Link href="/#registration" onClick={() => setMobileMenuOpen(false)} className="mt-2">
+                <Button size="sm" className="w-full">Начать</Button>
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </nav>
