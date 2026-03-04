@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getUser, saveUser, clearUser, StoredUser } from "@/lib/auth";
 import AuthModal from "@/components/AuthModal";
+import OnboardingModal from "@/components/onboarding/OnboardingModal";
 import { COMPANIES_META } from "@/lib/constants";
 
 interface ProfileData {
@@ -35,6 +36,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -67,6 +69,10 @@ export default function ProfilePage() {
           setIsPublic(d.profile.isPublic ?? false);
           setResumeText(d.profile.resumeText ?? "");
           if (d.profile.resumeText) setResumeFileName("резюме.pdf");
+        } else {
+          // Sync localStorage — profile not in DB
+          saveUser({ id: u.id, firstName: u.firstName, profile: null });
+          setShowOnboarding(true);
         }
         setLoading(false);
       })
@@ -190,15 +196,67 @@ export default function ProfilePage() {
             <h1 className="text-2xl font-black text-[#171923] mb-3" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
               Профиль не заполнен
             </h1>
-            <p className="text-[#718096] mb-6">Сначала пройди регистрацию на главной странице, чтобы создать профиль</p>
-            <Link
-              href="/#registration"
+            <p className="text-[#718096] mb-6">Заполни профиль, чтобы попасть в маркетплейс рефереров</p>
+            <button
+              onClick={() => setShowOnboarding(true)}
               className="inline-block bg-[#1863e5] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#1550c0] transition-colors"
             >
-              Зарегистрироваться
-            </Link>
+              Заполнить профиль
+            </button>
+            <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col gap-2">
+              <button
+                onClick={handleLogout}
+                className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-[#4A5568] hover:bg-[#F7FAFC] transition-colors"
+              >
+                Выйти из аккаунта
+              </button>
+              {!confirmDelete ? (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="w-full py-2.5 rounded-xl border border-red-200 text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+                >
+                  Удалить аккаунт
+                </button>
+              ) : (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-left">
+                  <p className="text-sm font-medium text-red-700 mb-1">Ты уверен?</p>
+                  <p className="text-xs text-red-500 mb-4">Это действие необратимо — все данные будут удалены</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setConfirmDelete(false)}
+                      className="flex-1 py-2 rounded-lg border border-gray-200 bg-white text-sm text-[#4A5568] hover:bg-gray-50 transition-colors"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={deleting}
+                      className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-sm font-semibold text-white transition-colors disabled:opacity-60"
+                    >
+                      {deleting ? "Удаляю..." : "Да, удалить"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
+        {showOnboarding && user && (
+          <OnboardingModal
+            userId={user.id}
+            firstName={user.firstName}
+            onClose={() => {
+              setShowOnboarding(false);
+              fetch(`/api/profile?userId=${user.id}`)
+                .then((r) => r.json())
+                .then((d) => { if (d.profile) setProfile(d.profile); });
+            }}
+            onError={() => {
+              clearUser();
+              router.push("/");
+            }}
+          />
+        )}
       </div>
     );
   }

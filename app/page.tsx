@@ -24,7 +24,10 @@ export default function Home() {
 
   useEffect(() => {
     const saved = getUser();
-    if (saved) setUser(saved as AuthedUser);
+    if (saved) {
+      setUser(saved as AuthedUser);
+      if (!saved.profile) setShowOnboarding(true);
+    }
   }, []);
 
   const handleAuth = (authedUser: AuthedUser) => {

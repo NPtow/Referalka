@@ -11,6 +11,7 @@ interface Props {
   userId: number;
   firstName: string;
   onClose: () => void;
+  onError?: () => void;
 }
 
 export interface OnboardingData {
@@ -25,9 +26,10 @@ export interface OnboardingData {
 
 const STEPS = ["Компании", "Ссылки", "Роль", "Карточка"];
 
-export default function OnboardingModal({ userId, firstName, onClose }: Props) {
+export default function OnboardingModal({ userId, firstName, onClose, onError }: Props) {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [submitError, setSubmitError] = useState("");
   const [data, setData] = useState<OnboardingData>({
     companies: [],
     resumeUrl: "",
@@ -43,16 +45,24 @@ export default function OnboardingModal({ userId, firstName, onClose }: Props) {
   const back = () => setStep((s) => s - 1);
 
   const submit = async (finalData: OnboardingData) => {
-    const res = await fetch("/api/profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, ...finalData }),
-    });
-    const json = await res.json();
-    if (json.profile) {
-      saveUser({ id: userId, firstName, profile: json.profile });
-      setProfileId(json.profile.id);
-      setStep(3);
+    setSubmitError("");
+    try {
+      const res = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, ...finalData }),
+      });
+      const json = await res.json();
+      if (json.profile) {
+        saveUser({ id: userId, firstName, profile: json.profile });
+        setProfileId(json.profile.id);
+        setStep(3);
+      } else {
+        setSubmitError("Не удалось создать профиль. Попробуй войти заново.");
+        onError?.();
+      }
+    } catch {
+      setSubmitError("Ошибка сети. Проверь соединение и попробуй снова.");
     }
   };
 
@@ -74,6 +84,11 @@ export default function OnboardingModal({ userId, firstName, onClose }: Props) {
         </div>
 
         <div className="p-6">
+          {submitError && (
+            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+              {submitError}
+            </div>
+          )}
           {step === 0 && (
             <Step1Companies
               selected={data.companies}
