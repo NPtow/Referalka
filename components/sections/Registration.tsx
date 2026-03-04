@@ -9,10 +9,16 @@ type Status = "idle" | "waiting" | "done";
 
 export default function Registration({ onAuth }: Props) {
   const [status, setStatus] = useState<Status>("idle");
+  const statusRef = useRef<Status>("idle");
   const tokenRef = useRef<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onAuthRef = useRef(onAuth);
   onAuthRef.current = onAuth;
+
+  const updateStatus = (s: Status) => {
+    statusRef.current = s;
+    setStatus(s);
+  };
 
   // Pre-fetch a token on mount so the button is ready immediately
   useEffect(() => {
@@ -42,7 +48,7 @@ export default function Registration({ onAuth }: Props) {
 
     // Open bot link
     window.open(`https://t.me/referalkaaaa_bot?start=login_${token}`, "_blank");
-    setStatus("waiting");
+    updateStatus("waiting");
 
     // Start polling
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -53,7 +59,7 @@ export default function Registration({ onAuth }: Props) {
         if (data.ready && data.user) {
           clearInterval(intervalRef.current!);
           intervalRef.current = null;
-          setStatus("done");
+          updateStatus("done");
           onAuthRef.current({
             id: data.user.id,
             firstName: data.user.firstName,
@@ -65,12 +71,12 @@ export default function Registration({ onAuth }: Props) {
       }
     }, 2000);
 
-    // Stop polling after 5 minutes
+    // Stop polling after 5 minutes (use statusRef to avoid stale closure)
     setTimeout(() => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
-        if (status === "waiting") setStatus("idle");
+        if (statusRef.current === "waiting") updateStatus("idle");
       }
     }, 5 * 60 * 1000);
   }
@@ -112,7 +118,7 @@ export default function Registration({ onAuth }: Props) {
               <button
                 onClick={() => {
                   if (intervalRef.current) clearInterval(intervalRef.current);
-                  setStatus("idle");
+                  updateStatus("idle");
                   tokenRef.current = null;
                   fetch("/api/auth/telegram/init")
                     .then((r) => r.json())

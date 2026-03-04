@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { saveUser } from "@/lib/auth";
 import Step1Companies from "./Step1Companies";
 import Step2Resume from "./Step2Resume";
 import Step3RoleExp from "./Step3RoleExp";
@@ -49,6 +50,7 @@ export default function OnboardingModal({ userId, firstName, onClose }: Props) {
     });
     const json = await res.json();
     if (json.profile) {
+      saveUser({ id: userId, firstName, profile: json.profile });
       setProfileId(json.profile.id);
       setStep(3);
     }
