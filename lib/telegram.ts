@@ -30,6 +30,7 @@ export function verifyTelegramAuth(data: TelegramUser): boolean {
 
   const secretKey = crypto.createHash("sha256").update(token).digest();
   const checkString = Object.keys(rest)
+    .filter((k) => rest[k as keyof typeof rest] !== undefined)
     .sort()
     .map((k) => `${k}=${rest[k as keyof typeof rest]}`)
     .join("\n");
