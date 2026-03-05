@@ -14,8 +14,6 @@ export async function GET() {
   const params = new URLSearchParams({
     bot_id: botId,
     origin: appUrl,
-    embed: "1",
-    request_access: "write",
     return_to: `${appUrl}/api/auth/telegram/callback`,
   });
 
