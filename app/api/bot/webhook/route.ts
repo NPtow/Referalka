@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { buildTelegramLoginCode } from "@/lib/telegram-login";
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,7 +51,11 @@ export async function POST(req: NextRequest) {
       data: { userId: user.id },
     });
 
-    await sendTelegramMessage(from.id, "✅ Ты вошёл в Реферлочку! Вернись на сайт.");
+    const loginCode = buildTelegramLoginCode(token);
+    await sendTelegramMessage(
+      from.id,
+      `Код для входа в Рефералку: <b>${loginCode}</b>\n\nВведи его на сайте в течение 10 минут.`
+    );
 
     console.log("[Bot Webhook] Success. userId:", user.id);
     return NextResponse.json({ ok: true });
