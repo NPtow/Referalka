@@ -50,17 +50,33 @@ export async function resolveTelegramBotUsername(): Promise<string | null> {
   }
 }
 
-export async function sendTelegramMessage(chatId: number, text: string): Promise<void> {
+export async function sendTelegramMessage(chatId: number, text: string): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return;
+  if (!token) {
+    console.error("[Telegram] TELEGRAM_BOT_TOKEN is missing");
+    return false;
+  }
+
   try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
     });
+
+    const payload = (await response.json().catch(() => null)) as
+      | { ok?: boolean; description?: string }
+      | null;
+
+    if (!response.ok || !payload?.ok) {
+      console.error("[Telegram] sendMessage failed:", payload?.description ?? response.statusText);
+      return false;
+    }
+
+    return true;
   } catch {
-    // fire-and-forget: ignore network errors
+    console.error("[Telegram] sendMessage network error");
+    return false;
   }
 }
 

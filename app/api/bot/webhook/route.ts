@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { toAppUserId } from "@/lib/telegram-user-id";
+
+const MAX_INT_32 = 2_147_483_647;
+
+function canUseIntDirectly(id: number): boolean {
+  return Number.isInteger(id) && id > 0 && id <= MAX_INT_32;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,8 +45,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
     const from = message.from;
+    const tgId = Number(from.id);
+    const normalizedUsername = from.username?.trim() || null;
 
-    console.log("[Bot Webhook] Auth attempt. token:", token, "userId:", from.id);
+    console.log("[Bot Webhook] Auth attempt. token:", token, "userId:", tgId);
 
     const pending = await prisma.pendingAuth.findUnique({ where: { token } });
 
@@ -49,30 +58,70 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    const user = await prisma.user.upsert({
-      where: { id: from.id },
-      update: {
-        firstName: from.first_name,
-        username: from.username ?? null,
-        photoUrl: from.photo ?? null,
-      },
-      create: {
-        id: from.id,
-        firstName: from.first_name,
-        username: from.username ?? null,
-        photoUrl: null,
-      },
-    });
+    let user = normalizedUsername
+      ? await prisma.user.findFirst({ where: { username: normalizedUsername } })
+      : null;
+
+    if (!user) {
+      const preferredId = toAppUserId(tgId);
+      const existingById = await prisma.user.findUnique({
+        where: { id: preferredId },
+        select: { id: true, username: true },
+      });
+
+      if (existingById && !normalizedUsername) {
+        await sendTelegramMessage(
+          from.id,
+          "Для входа нужен Telegram username. Установи username в настройках Telegram и попробуй снова."
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      if (existingById && normalizedUsername && existingById.username !== normalizedUsername) {
+        await sendTelegramMessage(
+          from.id,
+          "Не удалось связать аккаунт. Попробуй снова или напиши в поддержку."
+        );
+        return NextResponse.json({ ok: true });
+      }
+
+      user = await prisma.user.upsert({
+        where: { id: preferredId },
+        update: {
+          firstName: from.first_name,
+          username: normalizedUsername,
+          photoUrl: null,
+        },
+        create: {
+          id: preferredId,
+          firstName: from.first_name,
+          username: normalizedUsername,
+          photoUrl: null,
+        },
+      });
+    } else {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          firstName: from.first_name,
+          username: normalizedUsername,
+        },
+      });
+    }
 
     await prisma.pendingAuth.update({
       where: { token },
       data: { userId: user.id },
     });
 
-    await sendTelegramMessage(
-      from.id,
+    const messageSent = await sendTelegramMessage(
+      canUseIntDirectly(tgId) ? tgId : from.id,
       `Код для входа в Рефералку: <b>${token}</b>\n\nВведи его на сайте в течение 10 минут.`
     );
+
+    if (!messageSent) {
+      console.error("[Bot Webhook] Failed to send login code to chat:", tgId);
+    }
 
     console.log("[Bot Webhook] Success. userId:", user.id);
     return NextResponse.json({ ok: true });
