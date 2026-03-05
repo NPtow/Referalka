@@ -34,7 +34,8 @@ export default function TelegramLoginButton({ className }: Props) {
 
     const script = document.createElement("script");
     script.src = "https://oauth.telegram.org/js/telegram-login.js?3";
-    script.setAttribute("data-client-id", process.env.NEXT_PUBLIC_TELEGRAM_CLIENT_ID!);
+    const clientId = process.env.NEXT_PUBLIC_TELEGRAM_CLIENT_ID || "8686114382";
+    script.setAttribute("data-client-id", clientId);
     script.setAttribute("data-onauth", "onTelegramAuth(data)");
     script.setAttribute("data-request-access", "write");
     script.async = true;
