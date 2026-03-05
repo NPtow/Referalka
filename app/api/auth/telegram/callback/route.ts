@@ -46,7 +46,9 @@ export async function GET(request: NextRequest) {
     const token = await signJWT({ userId: user.id });
     const userInfo = { id: user.id, firstName: user.firstName, profile: user.profile ?? null };
 
-    const response = NextResponse.redirect(`${appUrl}/profile`);
+    // Redirect: new users or no profile → /profile, otherwise → /dashboard
+    const redirectPath = user.profile ? "/dashboard" : "/profile";
+    const response = NextResponse.redirect(`${appUrl}${redirectPath}`);
 
     // Secure JWT for server-side auth checks and middleware
     response.cookies.set("auth_token", token, {

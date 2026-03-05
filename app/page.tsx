@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Hero from "@/components/sections/Hero";
 import CompaniesStrip from "@/components/sections/CompaniesStrip";
 import HowItWorks from "@/components/sections/HowItWorks";
@@ -17,12 +18,17 @@ interface AuthedUser {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [user, setUser] = useState<AuthedUser | null>(null);
 
   useEffect(() => {
     const saved = getUser();
-    if (saved) setUser(saved as AuthedUser);
-  }, []);
+    if (saved) {
+      router.replace("/dashboard");
+      return;
+    }
+    setUser(null);
+  }, [router]);
 
   return (
     <>
@@ -31,24 +37,7 @@ export default function Home() {
         <CompaniesStrip />
         <HowItWorks />
         <ForWhom />
-        {user ? (
-          <section id="registration" className="py-20 px-4 bg-[#F7FAFC]">
-            <div className="max-w-md mx-auto text-center">
-              <p className="text-2xl font-black text-[#171923] mb-4" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
-                Привет, {user.firstName}! 👋
-              </p>
-              <p className="text-[#718096] mb-8">Ты уже в системе. Перейди в профиль, чтобы управлять заявками.</p>
-              <Link
-                href="/profile"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-[#1863e5] hover:bg-[#1251c0] text-white font-semibold rounded-xl transition-colors"
-              >
-                Перейти в профиль →
-              </Link>
-            </div>
-          </section>
-        ) : (
-          <Registration />
-        )}
+        <Registration />
         <FAQ />
       </main>
       <Footer />

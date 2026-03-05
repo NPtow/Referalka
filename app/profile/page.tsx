@@ -69,7 +69,7 @@ export default function ProfilePage() {
           setIsPublic(d.profile.isPublic ?? false);
           setResumeText(d.profile.resumeText ?? "");
           if (d.profile.resumeText) setResumeFileName("резюме.pdf");
-        } else {
+        } else if (process.env.NEXT_PUBLIC_SHOW_ONBOARDING === "true") {
           setShowOnboarding(true);
         }
         setLoading(false);
@@ -246,9 +246,7 @@ export default function ProfilePage() {
       <div className="max-w-2xl mx-auto px-4 py-12">
         {/* Breadcrumb */}
         <div className="text-sm text-[#A0AEC0] mb-6">
-          <Link href="/" className="hover:text-[#1863e5] transition-colors">Главная</Link>
-          <span className="mx-2">/</span>
-          <Link href="/marketplace" className="hover:text-[#1863e5] transition-colors">Маркетплейс</Link>
+          <Link href="/dashboard" className="hover:text-[#1863e5] transition-colors">Главная</Link>
           <span className="mx-2">/</span>
           <span className="text-[#718096]">Мой профиль</span>
         </div>
@@ -465,7 +463,7 @@ export default function ProfilePage() {
           {saving ? "Сохраняю..." : saved ? "Сохранено ✓" : "Сохранить"}
         </button>
 
-        {isPublic && (
+        {isPublic && process.env.NEXT_PUBLIC_SHOW_MARKETPLACE === "true" && (
           <p className="text-center text-xs text-[#718096] mt-3">
             Твой профиль виден в{" "}
             <Link href="/marketplace" className="text-[#1863e5] hover:underline">маркетплейсе →</Link>
