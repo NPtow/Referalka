@@ -14,7 +14,7 @@ export async function GET() {
   const params = new URLSearchParams({
     bot_id: botId,
     origin: appUrl,
-    return_to: `${appUrl}/api/auth/telegram/callback`,
+    return_to: `${appUrl}/api/auth/telegram/debug`,
   });
 
   return NextResponse.json({ url: `https://oauth.telegram.org/auth?${params.toString()}` });
