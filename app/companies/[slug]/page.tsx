@@ -6,7 +6,6 @@ import Image from "next/image";
 import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
 import { COMPANIES_META } from "@/lib/constants";
 import VacancyCard from "@/components/ui/VacancyCard";
-import OnboardingModal from "@/components/onboarding/OnboardingModal";
 
 interface Vacancy {
   id: string;
@@ -23,7 +22,7 @@ const LEVEL_FILTER = ["Все", "junior", "middle", "senior"];
 const TYPE_LABELS: Record<string, string> = { remote: "Удалённо", office: "Офис", hybrid: "Гибрид" };
 const LEVEL_LABELS: Record<string, string> = { junior: "Junior", middle: "Middle", senior: "Senior" };
 
-type ModalState = null | "auth" | "onboarding" | "payment" | "success" | "referral-sent" | "need-profile";
+type ModalState = null | "auth" | "payment" | "success" | "referral-sent" | "need-profile";
 
 export default function CompanyPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -74,10 +73,8 @@ export default function CompanyPage() {
     setSelectedVacancy(vacancy);
     if (!isSignedIn) {
       setModal("auth");
-    } else if (!hasProfile && process.env.NEXT_PUBLIC_SHOW_ONBOARDING === "true") {
-      setModal("onboarding");
     } else if (!hasProfile) {
-      window.location.href = "/profile";
+      setModal("need-profile");
     } else {
       setModal("payment");
     }
@@ -271,14 +268,6 @@ export default function CompanyPage() {
             </button>
           </div>
         </div>
-      )}
-      {modal === "onboarding" && (
-        <OnboardingModal
-          onClose={() => {
-            setModal(null);
-            setHasProfile(true);
-          }}
-        />
       )}
       {modal === "payment" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">

@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
-import OnboardingModal from "@/components/onboarding/OnboardingModal";
 
 interface StubVacancy {
   id: string;
@@ -84,7 +83,7 @@ const LEVEL_COLORS: Record<string, string> = {
   lead: "bg-orange-50 text-orange-700",
 };
 
-type ModalState = null | "auth" | "onboarding" | "payment" | "success";
+type ModalState = null | "auth" | "need-profile" | "payment" | "success";
 
 export default function ForYouPage() {
   const { isSignedIn, user } = useUser();
@@ -118,7 +117,7 @@ export default function ForYouPage() {
     if (!isSignedIn) {
       setModal("auth");
     } else if (!hasProfile) {
-      setModal("onboarding");
+      setModal("need-profile");
     } else {
       setModal("payment");
     }
@@ -290,13 +289,30 @@ export default function ForYouPage() {
           </div>
         </div>
       )}
-      {modal === "onboarding" && (
-        <OnboardingModal
-          onClose={() => {
-            setHasProfile(true);
-            setModal(null);
-          }}
-        />
+      {modal === "need-profile" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-8 text-center">
+            <div className="text-4xl mb-3">📝</div>
+            <h3 className="text-xl font-black text-[#171923] mb-2" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
+              Сначала заполни профиль
+            </h3>
+            <p className="text-sm text-[#718096] mb-6">
+              Чтобы запросить реферал, нужно заполнить профиль на экране профиля.
+            </p>
+            <a
+              href="/profile"
+              className="block w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors mb-3"
+            >
+              Открыть профиль →
+            </a>
+            <button
+              onClick={() => setModal(null)}
+              className="text-sm text-[#A0AEC0] hover:text-[#718096] transition-colors"
+            >
+              Позже
+            </button>
+          </div>
+        </div>
       )}
       {modal === "payment" && selectedVacancy && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">

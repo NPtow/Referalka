@@ -2,22 +2,88 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { resolveCurrentAppUser } from "@/lib/resolve-current-app-user";
 
+type ProfilePayload = {
+  companies: string[];
+  role: string;
+  experience: number;
+  resumeUrl: string | null;
+  linkedinUrl: string | null;
+  githubUrl: string | null;
+  siteUrl: string | null;
+  bio: string | null;
+  location: string | null;
+  openToRelocation: boolean;
+  isPublic: boolean;
+  resumeText: string | null;
+};
+
+function normalizePayload(raw: unknown): ProfilePayload {
+  const body = (raw ?? {}) as Record<string, unknown>;
+  return {
+    companies: Array.isArray(body.companies)
+      ? body.companies.map((v) => String(v).trim()).filter(Boolean)
+      : [],
+    role: String(body.role ?? "").trim(),
+    experience: Number(body.experience ?? 0),
+    resumeUrl: body.resumeUrl ? String(body.resumeUrl).trim() : null,
+    linkedinUrl: body.linkedinUrl ? String(body.linkedinUrl).trim() : null,
+    githubUrl: body.githubUrl ? String(body.githubUrl).trim() : null,
+    siteUrl: body.siteUrl ? String(body.siteUrl).trim() : null,
+    bio: body.bio ? String(body.bio).trim() : null,
+    location: body.location ? String(body.location).trim() : null,
+    openToRelocation: Boolean(body.openToRelocation),
+    isPublic: Boolean(body.isPublic),
+    resumeText: body.resumeText ? String(body.resumeText) : null,
+  };
+}
+
+function buildSummary(payload: ProfilePayload): string {
+  return [
+    `Роль: ${payload.role}`,
+    `Опыт: ${payload.experience} лет`,
+    `Желаемые компании: ${payload.companies.join(", ")}`,
+    payload.location && `Локация: ${payload.location}`,
+    payload.openToRelocation ? "Готов к переезду" : null,
+    payload.bio && `О себе: ${payload.bio}`,
+    payload.resumeUrl && `Резюме: ${payload.resumeUrl}`,
+    payload.linkedinUrl && `LinkedIn: ${payload.linkedinUrl}`,
+    payload.githubUrl && `GitHub: ${payload.githubUrl}`,
+    payload.siteUrl && `Сайт: ${payload.siteUrl}`,
+    payload.resumeText && `\n--- Текст резюме ---\n${payload.resumeText}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function validatePayload(payload: ProfilePayload): string | null {
+  if (!payload.role) return "Role is required";
+  if (!payload.companies.length) return "At least one company is required";
+  if (!Number.isFinite(payload.experience) || payload.experience < 0) {
+    return "Experience must be a non-negative number";
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   const user = await resolveCurrentAppUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json();
-  const { companies, role, experience, resumeUrl, linkedinUrl, githubUrl, siteUrl } = body;
-
-  if (!companies?.length || !role || experience === undefined) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  const payload = normalizePayload(await req.json());
+  const validationError = validatePayload(payload);
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
   }
+
+  const summary = buildSummary(payload);
 
   const profile = await prisma.profile.upsert({
     where: { userId: user.id },
-    update: { companies, role, experience, resumeUrl, linkedinUrl, githubUrl, siteUrl },
-    create: { userId: user.id, companies, role, experience, resumeUrl, linkedinUrl, githubUrl, siteUrl },
-    include: { user: { select: { firstName: true, username: true, photoUrl: true } } },
+    update: { ...payload, summary },
+    create: { userId: user.id, ...payload, summary },
+    include: {
+      user: { select: { firstName: true, username: true, photoUrl: true } },
+      _count: { select: { views: true } },
+    },
   });
 
   return NextResponse.json({ profile });
@@ -60,39 +126,44 @@ export async function PATCH(req: NextRequest) {
   const user = await resolveCurrentAppUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { bio, location, openToRelocation, isPublic, resumeText } = await req.json();
-
   const existing = await prisma.profile.findUnique({
     where: { userId: user.id },
-    select: { role: true, experience: true, companies: true, resumeUrl: true, linkedinUrl: true, githubUrl: true, siteUrl: true },
+    select: {
+      companies: true,
+      role: true,
+      experience: true,
+      resumeUrl: true,
+      linkedinUrl: true,
+      githubUrl: true,
+      siteUrl: true,
+      bio: true,
+      location: true,
+      openToRelocation: true,
+      isPublic: true,
+      resumeText: true,
+    },
   });
 
   if (!existing) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
 
+  const incoming = normalizePayload({ ...existing, ...(await req.json()) });
+  const validationError = validatePayload(incoming);
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
+  }
+
+  const summary = buildSummary(incoming);
+
   const profile = await prisma.profile.update({
     where: { userId: user.id },
-    data: { bio, location, openToRelocation, isPublic, resumeText },
+    data: { ...incoming, summary },
+    include: {
+      user: { select: { firstName: true, username: true, photoUrl: true } },
+      _count: { select: { views: true } },
+    },
   });
 
-  const summary = [
-    `Роль: ${existing.role}`,
-    `Опыт: ${existing.experience} лет`,
-    `Желаемые компании: ${existing.companies.join(", ")}`,
-    profile.location && `Локация: ${profile.location}`,
-    profile.openToRelocation ? "Готов к переезду" : null,
-    profile.bio && `О себе: ${profile.bio}`,
-    existing.resumeUrl && `Резюме: ${existing.resumeUrl}`,
-    existing.linkedinUrl && `LinkedIn: ${existing.linkedinUrl}`,
-    existing.githubUrl && `GitHub: ${existing.githubUrl}`,
-    existing.siteUrl && `Сайт: ${existing.siteUrl}`,
-    profile.resumeText && `\n--- Текст резюме ---\n${profile.resumeText}`,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  await prisma.profile.update({ where: { userId: user.id }, data: { summary } });
-
-  return NextResponse.json({ profile: { ...profile, summary } });
+  return NextResponse.json({ profile });
 }
