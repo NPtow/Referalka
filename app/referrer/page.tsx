@@ -1,21 +1,12 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getUser, saveUser, StoredUser } from "@/lib/auth";
+import { getUser, StoredUser } from "@/lib/auth";
 import { COMPANIES_META } from "@/lib/constants";
-import { TelegramUser } from "@/lib/telegram";
-
-declare global {
-  interface Window {
-    onTelegramAuthReferrer: (user: TelegramUser) => void;
-  }
-}
 
 export default function ReferrerPage() {
   const router = useRouter();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const botName = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME ?? "referalocka_bot";
 
   const [user, setUser] = useState<StoredUser | null>(null);
   const [company, setCompany] = useState("");
@@ -28,37 +19,11 @@ export default function ReferrerPage() {
     if (u) setUser(u);
   }, []);
 
-  const loadWidget = useCallback(() => {
-    if (!containerRef.current) return;
-    window.onTelegramAuthReferrer = async (tgUser: TelegramUser) => {
-      const res = await fetch("/api/auth/telegram", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(tgUser),
-      });
-      const json = await res.json();
-      if (json.user) {
-        const u = { id: json.user.id, firstName: json.user.firstName, profile: json.user.profile ?? null };
-        saveUser(u);
-        setUser(u);
-      }
-    };
-
-    const script = document.createElement("script");
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
-    script.setAttribute("data-telegram-login", botName);
-    script.setAttribute("data-size", "large");
-    script.setAttribute("data-radius", "12");
-    script.setAttribute("data-onauth", "onTelegramAuthReferrer(user)");
-    script.setAttribute("data-request-access", "write");
-    script.async = true;
-    containerRef.current.innerHTML = "";
-    containerRef.current.appendChild(script);
-  }, [botName]);
-
-  useEffect(() => {
-    if (!user) loadWidget();
-  }, [user, loadWidget]);
+  const handleLogin = async () => {
+    const res = await fetch("/api/auth/telegram/url");
+    const { url } = await res.json();
+    window.location.href = url;
+  };
 
   const handleSave = async () => {
     if (!user || !company) return;
@@ -96,7 +61,17 @@ export default function ReferrerPage() {
           {!user ? (
             <div>
               <p className="text-sm text-[#4A5568] mb-4 text-center">Войди через Telegram, чтобы продолжить</p>
-              <div className="flex justify-center" ref={containerRef} />
+              <div className="flex justify-center">
+                <button
+                  onClick={handleLogin}
+                  className="flex items-center gap-2.5 px-6 py-3 bg-[#229ED9] hover:bg-[#1a8bc4] text-white font-semibold rounded-xl transition-colors text-sm"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.26 13.432l-2.939-.917c-.638-.203-.651-.638.136-.944l11.47-4.42c.53-.194.994.13.967.07z"/>
+                  </svg>
+                  Войти через Telegram
+                </button>
+              </div>
               <p className="text-xs text-[#A0AEC0] mt-4 text-center">Мы не храним лишнего. Только имя и username из Telegram</p>
             </div>
           ) : done ? (

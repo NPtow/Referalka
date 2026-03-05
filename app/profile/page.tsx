@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getUser, saveUser, clearUser, StoredUser } from "@/lib/auth";
+import { getUser, clearUser, StoredUser } from "@/lib/auth";
 import AuthModal from "@/components/AuthModal";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
 import { COMPANIES_META } from "@/lib/constants";
@@ -70,8 +70,6 @@ export default function ProfilePage() {
           setResumeText(d.profile.resumeText ?? "");
           if (d.profile.resumeText) setResumeFileName("резюме.pdf");
         } else {
-          // Sync localStorage — profile not in DB
-          saveUser({ id: u.id, firstName: u.firstName, profile: null });
           setShowOnboarding(true);
         }
         setLoading(false);
@@ -79,28 +77,8 @@ export default function ProfilePage() {
       .catch(() => setLoading(false));
   }, []);
 
-  const handleAuth = (authedUser: StoredUser) => {
-    saveUser(authedUser);
-    setUser(authedUser);
-    setShowAuth(false);
-
-    fetch(`/api/profile?userId=${authedUser.id}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.profile) {
-          setProfile(d.profile);
-          setBio(d.profile.bio ?? "");
-          setLocation(d.profile.location ?? "");
-          setOpenToRelocation(d.profile.openToRelocation ?? false);
-          setIsPublic(d.profile.isPublic ?? false);
-          setResumeText(d.profile.resumeText ?? "");
-          if (d.profile.resumeText) setResumeFileName("резюме.pdf");
-        }
-        setLoading(false);
-      });
-  };
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
     clearUser();
     router.push("/");
   };
@@ -181,7 +159,7 @@ export default function ProfilePage() {
           </div>
         </div>
         {showAuth && (
-          <AuthModal onAuth={handleAuth} onClose={() => setShowAuth(false)} />
+          <AuthModal onClose={() => setShowAuth(false)} />
         )}
       </div>
     );

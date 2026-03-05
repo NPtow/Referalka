@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getUser, saveUser, StoredUser } from "@/lib/auth";
+import { getUser, StoredUser } from "@/lib/auth";
 import AuthModal from "@/components/AuthModal";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
 
@@ -111,15 +111,6 @@ export default function ForYouPage() {
     }
   };
 
-  const handleAuth = (authedUser: StoredUser) => {
-    saveUser(authedUser);
-    setUser(authedUser);
-    if (!authedUser.profile) {
-      setModal("onboarding");
-    } else {
-      setModal("payment");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#F7FAFC]">
@@ -278,7 +269,7 @@ export default function ForYouPage() {
 
       {/* Modals */}
       {modal === "auth" && (
-        <AuthModal onAuth={handleAuth} onClose={() => setModal(null)} />
+        <AuthModal onClose={() => setModal(null)} />
       )}
       {modal === "onboarding" && user && (
         <OnboardingModal

@@ -8,8 +8,7 @@ import ForWhom from "@/components/sections/ForWhom";
 import Registration from "@/components/sections/Registration";
 import FAQ from "@/components/sections/FAQ";
 import Footer from "@/components/sections/Footer";
-import OnboardingModal from "@/components/onboarding/OnboardingModal";
-import { saveUser, getUser } from "@/lib/auth";
+import { getUser } from "@/lib/auth";
 
 interface AuthedUser {
   id: number;
@@ -19,23 +18,11 @@ interface AuthedUser {
 
 export default function Home() {
   const [user, setUser] = useState<AuthedUser | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     const saved = getUser();
-    if (saved) {
-      setUser(saved as AuthedUser);
-      if (!saved.profile) setShowOnboarding(true);
-    }
+    if (saved) setUser(saved as AuthedUser);
   }, []);
-
-  const handleAuth = (authedUser: AuthedUser) => {
-    saveUser(authedUser);
-    setUser(authedUser);
-    if (!authedUser.profile) {
-      setShowOnboarding(true);
-    }
-  };
 
   return (
     <>
@@ -60,18 +47,11 @@ export default function Home() {
             </div>
           </section>
         ) : (
-          <Registration onAuth={handleAuth} />
+          <Registration />
         )}
         <FAQ />
       </main>
       <Footer />
-      {showOnboarding && user && (
-        <OnboardingModal
-          userId={user.id}
-          firstName={user.firstName}
-          onClose={() => setShowOnboarding(false)}
-        />
-      )}
     </>
   );
 }

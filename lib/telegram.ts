@@ -45,3 +45,33 @@ export function verifyTelegramAuth(data: TelegramUser): boolean {
   console.log("[TG Auth] HMAC match:", isValid, "| isRecent:", isRecent, "| computed:", hmac, "| received:", hash);
   return isValid && isRecent;
 }
+
+export interface OAuthTelegramUser {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
+}
+
+export function verifyTelegramHash(data: OAuthTelegramUser): boolean {
+  const { hash, ...rest } = data;
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return false;
+
+  const checkString = Object.entries(rest)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join("\n");
+
+  const secretKey = crypto.createHash("sha256").update(token).digest();
+  const expectedHash = crypto.createHmac("sha256", secretKey).update(checkString).digest("hex");
+
+  const age = Math.floor(Date.now() / 1000) - data.auth_date;
+  if (age > 600) return false;
+
+  return expectedHash === hash;
+}

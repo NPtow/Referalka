@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { COMPANIES_META } from "@/lib/constants";
-import { getUser, saveUser, StoredUser } from "@/lib/auth";
+import { getUser, StoredUser } from "@/lib/auth";
 import VacancyCard from "@/components/ui/VacancyCard";
 import AuthModal from "@/components/AuthModal";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
@@ -55,16 +55,6 @@ export default function CompanyPage() {
     if (!currentUser) {
       setModal("auth");
     } else if (!currentUser.profile) {
-      setModal("onboarding");
-    } else {
-      setModal("payment");
-    }
-  };
-
-  const handleAuth = (authedUser: StoredUser) => {
-    saveUser(authedUser);
-    setUser(authedUser);
-    if (!authedUser.profile) {
       setModal("onboarding");
     } else {
       setModal("payment");
@@ -207,7 +197,7 @@ export default function CompanyPage() {
 
       {/* Modals */}
       {modal === "auth" && (
-        <AuthModal onAuth={handleAuth} onClose={() => setModal(null)} />
+        <AuthModal onClose={() => setModal(null)} />
       )}
       {modal === "onboarding" && user && (
         <OnboardingModal
