@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { signJWT } from "@/lib/jwt";
-import { buildTelegramLoginCode, normalizeLoginCode } from "@/lib/telegram-login";
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
@@ -12,9 +11,13 @@ export async function POST(request: NextRequest) {
   }
 
   const { code } = await request.json();
-  const normalizedCode = normalizeLoginCode(String(code ?? ""));
+  const normalizedCode = String(code ?? "").replace(/\D/g, "").slice(0, 6);
   if (normalizedCode.length !== 6) {
     return NextResponse.json({ error: "Введите 6-значный код." }, { status: 400 });
+  }
+
+  if (normalizedCode !== token) {
+    return NextResponse.json({ error: "Неверный код." }, { status: 401 });
   }
 
   const pending = await prisma.pendingAuth.findUnique({ where: { token } });
@@ -27,11 +30,6 @@ export async function POST(request: NextRequest) {
       { error: "Бот ещё не подтвердил вход. Нажми /start в боте и попробуй снова." },
       { status: 400 }
     );
-  }
-
-  const expectedCode = buildTelegramLoginCode(token);
-  if (normalizedCode !== expectedCode) {
-    return NextResponse.json({ error: "Неверный код." }, { status: 401 });
   }
 
   const user = await prisma.user.findUnique({

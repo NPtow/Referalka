@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendTelegramMessage } from "@/lib/telegram";
-import { buildTelegramLoginCode } from "@/lib/telegram-login";
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,7 +13,13 @@ export async function POST(req: NextRequest) {
 
     const text: string = message.text;
 
-    if (text === "/start") {
+    const startMatch = text.match(/^\/start(?:@\w+)?(?:\s+(.+))?$/);
+    if (!startMatch) {
+      return NextResponse.json({ ok: true });
+    }
+
+    const payload = startMatch[1]?.trim();
+    if (!payload) {
       await sendTelegramMessage(
         message.from.id,
         "Чтобы войти, нажми на кнопку входа на сайте и перейди в бота по ссылке из сайта."
@@ -22,11 +27,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    if (!text.startsWith("/start login_")) {
+    if (!payload.startsWith("login_")) {
+      await sendTelegramMessage(message.from.id, "Неизвестная команда. Запусти вход заново с сайта.");
       return NextResponse.json({ ok: true });
     }
 
-    const token = text.replace("/start login_", "").trim();
+    const token = payload.replace("login_", "").trim();
+    if (!/^\d{6}$/.test(token)) {
+      await sendTelegramMessage(message.from.id, "Код входа некорректный. Запусти вход заново с сайта.");
+      return NextResponse.json({ ok: true });
+    }
     const from = message.from;
 
     console.log("[Bot Webhook] Auth attempt. token:", token, "userId:", from.id);
@@ -59,10 +69,9 @@ export async function POST(req: NextRequest) {
       data: { userId: user.id },
     });
 
-    const loginCode = buildTelegramLoginCode(token);
     await sendTelegramMessage(
       from.id,
-      `Код для входа в Рефералку: <b>${loginCode}</b>\n\nВведи его на сайте в течение 10 минут.`
+      `Код для входа в Рефералку: <b>${token}</b>\n\nВведи его на сайте в течение 10 минут.`
     );
 
     console.log("[Bot Webhook] Success. userId:", user.id);
