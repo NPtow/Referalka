@@ -12,14 +12,14 @@ export default function Registration() {
           Начни прямо сейчас
         </h2>
         <p className="text-[#718096] mb-10">
-          Зарегистрируйся через Telegram-бота и найди реферера в компанию мечты
+          Зарегистрируйся по email и найди реферера в компанию мечты
         </p>
         <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
           <div className="flex justify-center min-h-[48px]">
             <TelegramLoginButton />
           </div>
           <p className="text-xs text-[#A0AEC0] mt-4">
-            Нажми кнопку, получи код в боте и введи его на сайте
+            Введи email, получи код на почту и введи его на сайте
           </p>
         </div>
       </div>

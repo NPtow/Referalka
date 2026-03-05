@@ -16,7 +16,7 @@ export default function AuthModal({ onClose }: Props) {
           ×
         </button>
         <h2 className="text-xl font-black text-[#171923] mb-2 text-center" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
-          Войди через Telegram-бота
+          Войди по email
         </h2>
         <p className="text-sm text-[#718096] mb-6 text-center">
           Чтобы запросить реферал, нужно зарегистрироваться
@@ -25,7 +25,7 @@ export default function AuthModal({ onClose }: Props) {
           <TelegramLoginButton />
         </div>
         <p className="text-xs text-[#A0AEC0] mt-4 text-center">
-          Код для входа придет в боте
+          Код для входа придет на email
         </p>
       </div>
     </div>

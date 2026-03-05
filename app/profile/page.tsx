@@ -149,12 +149,12 @@ export default function ProfilePage() {
             <h1 className="text-2xl font-black text-[#171923] mb-3" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
               Мой профиль
             </h1>
-            <p className="text-[#718096] mb-6">Войди через Telegram, чтобы управлять своим профилем в маркетплейсе</p>
+            <p className="text-[#718096] mb-6">Войди по email, чтобы управлять своим профилем в маркетплейсе</p>
             <button
               onClick={() => setShowAuth(true)}
               className="bg-[#1863e5] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#1550c0] transition-colors"
             >
-              Войти через Telegram
+              Войти по email
             </button>
           </div>
         </div>

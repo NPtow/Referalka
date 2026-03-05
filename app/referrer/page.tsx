@@ -55,11 +55,11 @@ export default function ReferrerPage() {
 
           {!user ? (
             <div>
-              <p className="text-sm text-[#4A5568] mb-4 text-center">Войди через Telegram-бота, чтобы продолжить</p>
+              <p className="text-sm text-[#4A5568] mb-4 text-center">Войди по email, чтобы продолжить</p>
               <div className="flex justify-center">
                 <TelegramLoginButton />
               </div>
-              <p className="text-xs text-[#A0AEC0] mt-4 text-center">Бот отправит код, который нужно ввести на сайте</p>
+              <p className="text-xs text-[#A0AEC0] mt-4 text-center">Код отправится на почту, введи его на сайте</p>
             </div>
           ) : done ? (
             <div className="text-center py-6">
