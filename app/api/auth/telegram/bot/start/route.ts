@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolveTelegramBotUsername } from "@/lib/telegram";
 
 const LOGIN_TTL_SECONDS = 60 * 10;
 
 export async function POST() {
-  const botUsername =
-    process.env.TELEGRAM_BOT_USERNAME ?? process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+  const botUsername = await resolveTelegramBotUsername();
 
   if (!botUsername) {
     return NextResponse.json(
-      { error: "TELEGRAM_BOT_USERNAME is not configured" },
+      { error: "Не удалось определить username бота. Укажи TELEGRAM_BOT_USERNAME в .env" },
       { status: 500 }
     );
   }

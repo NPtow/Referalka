@@ -1,5 +1,55 @@
 import crypto from "crypto";
 
+let cachedBotUsername: string | null | undefined;
+
+function normalizeBotUsername(value: string): string {
+  let username = value.trim();
+  if (username.startsWith("https://t.me/")) {
+    username = username.replace(/^https?:\/\/t\.me\//, "");
+  }
+  if (username.startsWith("@")) {
+    username = username.slice(1);
+  }
+  return username.split("?")[0].split("/")[0].trim();
+}
+
+export async function resolveTelegramBotUsername(): Promise<string | null> {
+  const fromEnv =
+    process.env.TELEGRAM_BOT_USERNAME ??
+    process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ??
+    process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME;
+
+  if (fromEnv) {
+    const normalized = normalizeBotUsername(fromEnv);
+    return normalized || null;
+  }
+
+  if (cachedBotUsername !== undefined) return cachedBotUsername;
+
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    cachedBotUsername = null;
+    return null;
+  }
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${token}/getMe`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    const data = (await response.json()) as {
+      ok?: boolean;
+      result?: { username?: string };
+    };
+    const username = data?.ok ? data.result?.username : null;
+    cachedBotUsername = username ? normalizeBotUsername(username) : null;
+    return cachedBotUsername;
+  } catch {
+    cachedBotUsername = null;
+    return null;
+  }
+}
+
 export async function sendTelegramMessage(chatId: number, text: string): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return;
