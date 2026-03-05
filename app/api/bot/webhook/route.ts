@@ -14,6 +14,14 @@ export async function POST(req: NextRequest) {
 
     const text: string = message.text;
 
+    if (text === "/start") {
+      await sendTelegramMessage(
+        message.from.id,
+        "Чтобы войти, нажми на кнопку входа на сайте и перейди в бота по ссылке из сайта."
+      );
+      return NextResponse.json({ ok: true });
+    }
+
     if (!text.startsWith("/start login_")) {
       return NextResponse.json({ ok: true });
     }

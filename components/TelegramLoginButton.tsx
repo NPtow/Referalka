@@ -7,6 +7,7 @@ interface Props {
 
 export default function TelegramLoginButton({ className }: Props) {
   const [botUrl, setBotUrl] = useState<string | null>(null);
+  const [botDeepLink, setBotDeepLink] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [loadingStart, setLoadingStart] = useState(false);
   const [loadingVerify, setLoadingVerify] = useState(false);
@@ -23,7 +24,9 @@ export default function TelegramLoginButton({ className }: Props) {
         return;
       }
       setBotUrl(data.botUrl);
-      window.open(data.botUrl, "_blank", "noopener,noreferrer");
+      setBotDeepLink(data.botDeepLink ?? null);
+      const openUrl = data.botDeepLink ?? data.botUrl;
+      window.location.href = openUrl;
     } catch {
       setError("Ошибка сети. Попробуй ещё раз.");
     } finally {
@@ -67,12 +70,20 @@ export default function TelegramLoginButton({ className }: Props) {
       ) : (
         <div className="w-full max-w-sm space-y-3">
           <a
-            href={botUrl}
+            href={botDeepLink ?? botUrl}
             target="_blank"
             rel="noreferrer"
             className="block text-center text-sm font-medium text-[#1863e5] hover:underline"
           >
-            Открыть бота снова
+            Открыть Telegram
+          </a>
+          <a
+            href={botUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="block text-center text-xs text-[#718096] hover:underline"
+          >
+            Если не открылось, открыть через браузер
           </a>
           <input
             type="text"

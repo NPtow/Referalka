@@ -18,9 +18,11 @@ export async function POST() {
   const pending = await prisma.pendingAuth.create({
     data: { expiresAt },
   });
+  const startParam = `login_${pending.token}`;
 
   const response = NextResponse.json({
-    botUrl: `https://t.me/${botUsername}?start=login_${pending.token}`,
+    botUrl: `https://t.me/${botUsername}?start=${startParam}`,
+    botDeepLink: `tg://resolve?domain=${botUsername}&start=${startParam}`,
     expiresAt: expiresAt.toISOString(),
   });
 
