@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/session";
+import { resolveCurrentAppUser } from "@/lib/resolve-current-app-user";
 
 export async function GET() {
-  const session = await getSessionUser();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await resolveCurrentAppUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const requests = await prisma.referralRequest.findMany({
-    where: { userId: session.userId },
+    where: { userId: user.id },
     orderBy: { createdAt: "desc" },
   });
 
@@ -15,8 +15,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSessionUser();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await resolveCurrentAppUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { companySlug, companyName } = await req.json();
   if (!companySlug || !companyName) {
@@ -24,14 +24,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Check profile exists
-  const profile = await prisma.profile.findUnique({ where: { userId: session.userId } });
+  const profile = await prisma.profile.findUnique({ where: { userId: user.id } });
   if (!profile) {
     return NextResponse.json({ error: "Profile not complete" }, { status: 400 });
   }
 
   // Check for existing pending request to same company
   const existing = await prisma.referralRequest.findFirst({
-    where: { userId: session.userId, companySlug, status: "PENDING" },
+    where: { userId: user.id, companySlug, status: "PENDING" },
   });
   if (existing) {
     return NextResponse.json({ error: "Already requested", request: existing }, { status: 409 });
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const request = await prisma.referralRequest.create({
     data: {
-      userId: session.userId,
+      userId: user.id,
       companySlug,
       companyName,
     },

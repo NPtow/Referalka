@@ -3,8 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getUser, clearUser, StoredUser } from "@/lib/auth";
-import AuthModal from "@/components/AuthModal";
+import { SignInButton, SignUpButton, useClerk, useUser } from "@clerk/nextjs";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
 import { COMPANIES_META } from "@/lib/constants";
 
@@ -32,15 +31,14 @@ interface ProfileData {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [user, setUser] = useState<StoredUser | null>(null);
+  const { isLoaded, isSignedIn } = useUser();
+  const { signOut } = useClerk();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showAuth, setShowAuth] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Form state
   const [bio, setBio] = useState("");
   const [location, setLocation] = useState("");
   const [openToRelocation, setOpenToRelocation] = useState(false);
@@ -54,11 +52,13 @@ export default function ProfilePage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const u = getUser();
-    setUser(u);
-    if (!u) { setLoading(false); return; }
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      setLoading(false);
+      return;
+    }
 
-    fetch(`/api/profile?userId=${u.id}`)
+    fetch("/api/profile")
       .then((r) => r.json())
       .then((d) => {
         if (d.profile) {
@@ -75,24 +75,16 @@ export default function ProfilePage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [isLoaded, isSignedIn]);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    clearUser();
-    router.push("/");
+    await signOut({ redirectUrl: "/" });
   };
 
   const handleDeleteAccount = async () => {
-    if (!user) return;
     setDeleting(true);
-    await fetch("/api/profile", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id }),
-    });
-    clearUser();
-    router.push("/");
+    await fetch("/api/profile", { method: "DELETE" });
+    await signOut({ redirectUrl: "/" });
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,19 +112,18 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
-    if (!user) return;
     setSaving(true);
     await fetch("/api/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, bio, location, openToRelocation, isPublic, resumeText }),
+      body: JSON.stringify({ bio, location, openToRelocation, isPublic, resumeText }),
     });
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
 
-  if (loading) {
+  if (loading || !isLoaded) {
     return (
       <div className="min-h-screen bg-[#F7FAFC] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-[#1863e5] border-t-transparent rounded-full animate-spin" />
@@ -140,7 +131,7 @@ export default function ProfilePage() {
     );
   }
 
-  if (!user) {
+  if (!isSignedIn) {
     return (
       <div className="min-h-screen bg-[#F7FAFC]">
         <div className="h-16" />
@@ -149,18 +140,21 @@ export default function ProfilePage() {
             <h1 className="text-2xl font-black text-[#171923] mb-3" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
               Мой профиль
             </h1>
-            <p className="text-[#718096] mb-6">Войди по email, чтобы управлять своим профилем в маркетплейсе</p>
-            <button
-              onClick={() => setShowAuth(true)}
-              className="bg-[#1863e5] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#1550c0] transition-colors"
-            >
-              Войти по email
-            </button>
+            <p className="text-[#718096] mb-6">Войдите через Clerk, чтобы управлять профилем</p>
+            <div className="flex items-center justify-center gap-3">
+              <SignInButton mode="modal">
+                <button className="bg-[#1863e5] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#1550c0] transition-colors">
+                  Войти
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className="border border-gray-200 text-[#171923] font-semibold px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors">
+                  Регистрация
+                </button>
+              </SignUpButton>
+            </div>
           </div>
         </div>
-        {showAuth && (
-          <AuthModal onClose={() => setShowAuth(false)} />
-        )}
       </div>
     );
   }
@@ -219,18 +213,17 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-        {showOnboarding && user && (
+        {showOnboarding && (
           <OnboardingModal
-            userId={user.id}
-            firstName={user.firstName}
             onClose={() => {
               setShowOnboarding(false);
-              fetch(`/api/profile?userId=${user.id}`)
+              fetch("/api/profile")
                 .then((r) => r.json())
-                .then((d) => { if (d.profile) setProfile(d.profile); });
+                .then((d) => {
+                  if (d.profile) setProfile(d.profile);
+                });
             }}
             onError={() => {
-              clearUser();
               router.push("/");
             }}
           />
@@ -244,14 +237,12 @@ export default function ProfilePage() {
       <div className="h-16" />
 
       <div className="max-w-2xl mx-auto px-4 py-12">
-        {/* Breadcrumb */}
         <div className="text-sm text-[#A0AEC0] mb-6">
           <Link href="/dashboard" className="hover:text-[#1863e5] transition-colors">Главная</Link>
           <span className="mx-2">/</span>
           <span className="text-[#718096]">Мой профиль</span>
         </div>
 
-        {/* User header */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
           <div className="flex items-center gap-4">
             {profile.user.photoUrl ? (
@@ -272,12 +263,12 @@ export default function ProfilePage() {
                 {profile.user.firstName}
               </h1>
               {profile.user.username && (
-                <p className="text-sm text-[#A0AEC0]">@{profile.user.username}</p>
+                <p className="text-sm text-[#A0AEC0]">{profile.user.username}</p>
               )}
             </div>
             {(profile._count?.views ?? 0) > 0 && (
               <div className="text-right flex-shrink-0">
-                <p className="text-2xl font-black text-[#171923]">{profile._count!.views}</p>
+                <p className="text-2xl font-black text-[#171923]">{profile._count?.views ?? 0}</p>
                 <p className="text-xs text-[#A0AEC0]">просмотров</p>
               </div>
             )}
@@ -319,13 +310,10 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Base profile (readonly) */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
           <h2 className="text-base font-bold text-[#171923] mb-4">Основной профиль</h2>
           <div className="flex flex-wrap gap-2 text-sm text-[#718096] mb-3">
-            <span className="bg-[#F7FAFC] px-3 py-1 rounded-full border border-gray-200">
-              {profile.role}
-            </span>
+            <span className="bg-[#F7FAFC] px-3 py-1 rounded-full border border-gray-200">{profile.role}</span>
             <span className="bg-[#F7FAFC] px-3 py-1 rounded-full border border-gray-200">
               {profile.experience} {profile.experience === 1 ? "год" : profile.experience < 5 ? "года" : "лет"} опыта
             </span>
@@ -342,19 +330,33 @@ export default function ProfilePage() {
             })}
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
-            {profile.linkedinUrl && <a href={profile.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-[#1863e5] hover:underline">LinkedIn ↗</a>}
-            {profile.githubUrl && <a href={profile.githubUrl} target="_blank" rel="noopener noreferrer" className="text-[#1863e5] hover:underline">GitHub ↗</a>}
-            {profile.resumeUrl && <a href={profile.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-[#1863e5] hover:underline">Резюме ↗</a>}
-            {profile.siteUrl && <a href={profile.siteUrl} target="_blank" rel="noopener noreferrer" className="text-[#1863e5] hover:underline">Сайт ↗</a>}
+            {profile.linkedinUrl && (
+              <a href={profile.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-[#1863e5] hover:underline">
+                LinkedIn ↗
+              </a>
+            )}
+            {profile.githubUrl && (
+              <a href={profile.githubUrl} target="_blank" rel="noopener noreferrer" className="text-[#1863e5] hover:underline">
+                GitHub ↗
+              </a>
+            )}
+            {profile.resumeUrl && (
+              <a href={profile.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-[#1863e5] hover:underline">
+                Резюме ↗
+              </a>
+            )}
+            {profile.siteUrl && (
+              <a href={profile.siteUrl} target="_blank" rel="noopener noreferrer" className="text-[#1863e5] hover:underline">
+                Сайт ↗
+              </a>
+            )}
           </div>
         </div>
 
-        {/* Marketplace settings */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
           <h2 className="text-base font-bold text-[#171923] mb-1">Настройки маркетплейса</h2>
           <p className="text-xs text-[#A0AEC0] mb-5">Эти данные будут видны рефереру при просмотре твоего профиля</p>
 
-          {/* Bio */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
               О себе
@@ -369,7 +371,6 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* Location */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Локация</label>
             <input
@@ -381,7 +382,6 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* Open to relocation */}
           <div className="mb-5">
             <label className="flex items-center gap-3 cursor-pointer">
               <div
@@ -394,7 +394,6 @@ export default function ProfilePage() {
             </label>
           </div>
 
-          {/* Resume file upload */}
           <div className="mb-5">
             <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
               Резюме файлом
@@ -419,28 +418,21 @@ export default function ProfilePage() {
                 <p className="text-sm text-[#718096]">Обрабатываю файл...</p>
               ) : resumeText ? (
                 <div>
-                  <p className="text-sm font-medium text-green-700">
-                    ✓ {resumeFileName || "Резюме загружено"}
-                  </p>
+                  <p className="text-sm font-medium text-green-700">✓ {resumeFileName || "Резюме загружено"}</p>
                   <p className="text-xs text-[#718096] mt-1">
                     {resumeText.length.toLocaleString()} символов извлечено · нажми, чтобы заменить
                   </p>
                 </div>
               ) : (
                 <div>
-                  <p className="text-sm text-[#718096]">
-                    Нажми, чтобы загрузить PDF или DOCX
-                  </p>
+                  <p className="text-sm text-[#718096]">Нажми, чтобы загрузить PDF или DOCX</p>
                   <p className="text-xs text-[#A0AEC0] mt-1">Мы используем текст для подбора вакансий</p>
                 </div>
               )}
             </div>
-            {parseError && (
-              <p className="text-xs text-red-500 mt-1.5">{parseError}</p>
-            )}
+            {parseError && <p className="text-xs text-red-500 mt-1.5">{parseError}</p>}
           </div>
 
-          {/* isPublic toggle */}
           <div className="border-t border-gray-100 pt-5">
             <label className="flex items-start gap-3 cursor-pointer" onClick={() => setIsPublic(!isPublic)}>
               <div className={`mt-0.5 w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${isPublic ? "bg-[#1863e5]" : "bg-gray-200"}`}>
@@ -454,7 +446,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Save button */}
         <button
           onClick={handleSave}
           disabled={saving}
@@ -469,7 +460,6 @@ export default function ProfilePage() {
             <Link href="/marketplace" className="text-[#1863e5] hover:underline">маркетплейсе →</Link>
           </p>
         )}
-
       </div>
     </div>
   );

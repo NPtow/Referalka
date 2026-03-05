@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getSessionUser } from "@/lib/session";
+import { resolveCurrentAppUser } from "@/lib/resolve-current-app-user";
 
 export async function POST(req: NextRequest) {
-  const session = await getSessionUser();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await resolveCurrentAppUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { requestId } = await req.json();
   if (!requestId) return NextResponse.json({ error: "requestId required" }, { status: 400 });
 
   const request = await prisma.referralRequest.findFirst({
-    where: { id: requestId, userId: session.userId, status: "REFERRER_FOUND" },
+    where: { id: requestId, userId: user.id, status: "REFERRER_FOUND" },
   });
 
   if (!request) {

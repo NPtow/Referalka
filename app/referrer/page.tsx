@@ -1,32 +1,29 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getUser, StoredUser } from "@/lib/auth";
+import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
 import { COMPANIES_META } from "@/lib/constants";
-import TelegramLoginButton from "@/components/TelegramLoginButton";
 
 export default function ReferrerPage() {
   const router = useRouter();
+  const { isSignedIn, user } = useUser();
 
-  const [user, setUser] = useState<StoredUser | null>(null);
   const [company, setCompany] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    const u = getUser();
-    if (u) setUser(u);
-  }, []);
+  const displayName =
+    user?.firstName?.trim() || user?.username?.trim() || user?.primaryEmailAddress?.emailAddress?.split("@")[0] || "Пользователь";
 
   const handleSave = async () => {
-    if (!user || !company) return;
+    if (!company) return;
     setSaving(true);
     await fetch("/api/referrer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, company, linkedinUrl }),
+      body: JSON.stringify({ company, linkedinUrl }),
     });
     setSaving(false);
     setDone(true);
@@ -38,7 +35,6 @@ export default function ReferrerPage() {
       <div className="h-16" />
 
       <div className="max-w-lg mx-auto px-4 py-12">
-        {/* Breadcrumb */}
         <div className="text-sm text-[#A0AEC0] mb-6">
           <Link href="/" className="hover:text-[#1863e5] transition-colors">Главная</Link>
           <span className="mx-2">/</span>
@@ -53,30 +49,37 @@ export default function ReferrerPage() {
             Зарегистрируйся, чтобы находить кандидатов в маркетплейсе и давать им реферал
           </p>
 
-          {!user ? (
+          {!isSignedIn ? (
             <div>
-              <p className="text-sm text-[#4A5568] mb-4 text-center">Войди по email, чтобы продолжить</p>
-              <div className="flex justify-center">
-                <TelegramLoginButton />
+              <p className="text-sm text-[#4A5568] mb-4 text-center">Войди через Clerk, чтобы продолжить</p>
+              <div className="flex justify-center gap-2">
+                <SignInButton mode="modal">
+                  <button className="rounded-xl bg-[#1863e5] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1550c0] transition-colors">
+                    Войти
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-[#171923] hover:bg-gray-50 transition-colors">
+                    Регистрация
+                  </button>
+                </SignUpButton>
               </div>
-              <p className="text-xs text-[#A0AEC0] mt-4 text-center">Код отправится на почту, введи его на сайте</p>
             </div>
           ) : done ? (
             <div className="text-center py-6">
               <div className="text-4xl mb-3">🎉</div>
-              <p className="font-bold text-[#171923] text-lg">Готово, {user.firstName}!</p>
+              <p className="font-bold text-[#171923] text-lg">Готово, {displayName}!</p>
               <p className="text-sm text-[#718096] mt-1">Переходим в маркетплейс...</p>
             </div>
           ) : (
             <div>
               <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-100">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold flex-shrink-0">
-                  {user.firstName[0]}
+                  {displayName[0]?.toUpperCase() || "U"}
                 </div>
-                <p className="text-sm font-medium text-[#171923]">{user.firstName}</p>
+                <p className="text-sm font-medium text-[#171923]">{displayName}</p>
               </div>
 
-              {/* Company select */}
               <div className="mb-5">
                 <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
                   В какой компании ты работаешь? <span className="text-red-400">*</span>
@@ -93,7 +96,6 @@ export default function ReferrerPage() {
                 </select>
               </div>
 
-              {/* LinkedIn */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
                   LinkedIn <span className="text-[#A0AEC0] font-normal">(опционально)</span>
@@ -120,7 +122,7 @@ export default function ReferrerPage() {
 
         <p className="text-center text-xs text-[#A0AEC0] mt-4">
           Ищешь реферал сам?{" "}
-          <Link href="/#registration" className="text-[#1863e5] hover:underline">Зарегистрируйся как кандидат</Link>
+          <Link href="/companies" className="text-[#1863e5] hover:underline">Перейти к компаниям</Link>
         </p>
       </div>
     </div>

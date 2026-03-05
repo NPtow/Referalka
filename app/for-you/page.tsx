@@ -2,9 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { getUser, StoredUser } from "@/lib/auth";
-import AuthModal from "@/components/AuthModal";
+import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
 
 interface StubVacancy {
@@ -89,35 +87,48 @@ const LEVEL_COLORS: Record<string, string> = {
 type ModalState = null | "auth" | "onboarding" | "payment" | "success";
 
 export default function ForYouPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<StoredUser | null>(null);
+  const { isSignedIn, user } = useUser();
   const [modal, setModal] = useState<ModalState>(null);
   const [selectedVacancy, setSelectedVacancy] = useState<StubVacancy | null>(null);
+  const [hasProfile, setHasProfile] = useState(false);
+
+  const displayName =
+    user?.firstName?.trim() || user?.username?.trim() || user?.primaryEmailAddress?.emailAddress?.split("@")[0] || "Пользователь";
 
   useEffect(() => {
-    const u = getUser();
-    setUser(u);
-  }, []);
+    if (!isSignedIn) {
+      setHasProfile(false);
+      return;
+    }
+
+    fetch("/api/profile")
+      .then(async (r) => {
+        if (!r.ok) return null;
+        const data = await r.json();
+        return data.profile ?? null;
+      })
+      .then((profile) => {
+        setHasProfile(Boolean(profile));
+      })
+      .catch(() => setHasProfile(false));
+  }, [isSignedIn]);
 
   const handleRequest = (vacancy: StubVacancy) => {
     setSelectedVacancy(vacancy);
-    const currentUser = getUser();
-    if (!currentUser) {
+    if (!isSignedIn) {
       setModal("auth");
-    } else if (!currentUser.profile) {
+    } else if (!hasProfile) {
       setModal("onboarding");
     } else {
       setModal("payment");
     }
   };
 
-
   return (
     <div className="min-h-screen bg-[#F7FAFC]">
       <div className="h-16" />
 
       <div className="max-w-5xl mx-auto px-4 py-12">
-        {/* Breadcrumb */}
         <div className="text-sm text-[#A0AEC0] mb-6">
           <Link href="/" className="hover:text-[#1863e5] transition-colors">Главная</Link>
           <span className="mx-2">/</span>
@@ -125,18 +136,15 @@ export default function ForYouPage() {
         </div>
 
         <div className="flex flex-col md:flex-row gap-6">
-          {/* Left sidebar — user card */}
           <div className="md:w-56 flex-shrink-0">
             <div className="bg-white rounded-2xl border border-gray-200 p-5 sticky top-24">
-              {user ? (
+              {isSignedIn ? (
                 <>
                   <div className="w-12 h-12 rounded-full bg-[#1863e5] text-white flex items-center justify-center text-xl font-bold mb-3">
-                    {user.firstName[0]}
+                    {displayName[0]?.toUpperCase() || "U"}
                   </div>
-                  <p className="font-bold text-[#171923] text-sm mb-0.5">{user.firstName}</p>
-                  <p className="text-xs text-[#A0AEC0] mb-3">
-                    {(user.profile as { role?: string } | null)?.role ?? "Роль не указана"}
-                  </p>
+                  <p className="font-bold text-[#171923] text-sm mb-0.5">{displayName}</p>
+                  <p className="text-xs text-[#A0AEC0] mb-3">{hasProfile ? "Профиль заполнен" : "Профиль не заполнен"}</p>
                   <p className="text-xs text-[#A0AEC0] mb-4">Местоположение не указано</p>
                   <Link
                     href="/profile"
@@ -152,30 +160,26 @@ export default function ForYouPage() {
               ) : (
                 <>
                   <div className="w-12 h-12 rounded-full bg-[#EBF4FF] flex items-center justify-center text-xl mb-3">
-                    👤
+                    <span>👤</span>
                   </div>
                   <p className="text-sm text-[#718096] mb-3">Войди, чтобы видеть персональные вакансии</p>
-                  <button
-                    onClick={() => setModal("auth")}
-                    className="w-full text-sm bg-[#1863e5] text-white font-semibold py-2 rounded-xl hover:bg-[#1550c0] transition-colors"
-                  >
-                    Войти
-                  </button>
+                  <SignInButton mode="modal">
+                    <button className="w-full text-sm bg-[#1863e5] text-white font-semibold py-2 rounded-xl hover:bg-[#1550c0] transition-colors">
+                      Войти
+                    </button>
+                  </SignInButton>
                 </>
               )}
             </div>
           </div>
 
-          {/* Main content */}
           <div className="flex-1 min-w-0">
             <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-4">
               <div className="flex items-center gap-2 mb-1">
                 <h1 className="text-xl font-black text-[#171923]" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
                   Подобрано для тебя
                 </h1>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#EBF4FF] text-[#1863e5]">
-                  Скоро
-                </span>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#EBF4FF] text-[#1863e5]">Скоро</span>
               </div>
               <p className="text-sm text-[#A0AEC0]">
                 Вакансии будут подбираться автоматически на основе твоего профиля и резюме.
@@ -183,7 +187,6 @@ export default function ForYouPage() {
               </p>
             </div>
 
-            {/* Vacancy feed */}
             <div className="space-y-3">
               {STUB_VACANCIES.map((v) => (
                 <div
@@ -192,7 +195,6 @@ export default function ForYouPage() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                      {/* Company logo */}
                       <div className="w-10 h-10 rounded-xl bg-[#F7FAFC] border border-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
                         {v.logoPath ? (
                           <Image src={v.logoPath} alt={v.companyName} width={28} height={28} className="object-contain" />
@@ -202,7 +204,6 @@ export default function ForYouPage() {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        {/* Company name + New badge */}
                         <div className="flex items-center gap-2 mb-0.5">
                           <Link
                             href={`/companies/${v.companySlug}`}
@@ -215,13 +216,9 @@ export default function ForYouPage() {
                           </span>
                         </div>
 
-                        {/* Vacancy title */}
                         <p className="font-bold text-[#1863e5] text-base mb-1">{v.title}</p>
-
-                        {/* Posted time */}
                         <p className="text-xs text-[#A0AEC0] mb-2">{v.postedLabel}</p>
 
-                        {/* Tags */}
                         <div className="flex flex-wrap gap-1.5">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${LEVEL_COLORS[v.level] ?? "bg-gray-50 text-gray-600"}`}>
                             {LEVEL_LABELS[v.level] ?? v.level}
@@ -238,7 +235,6 @@ export default function ForYouPage() {
                       </div>
                     </div>
 
-                    {/* Request button */}
                     <button
                       onClick={() => handleRequest(v)}
                       className="flex-shrink-0 bg-[#1863e5] text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-[#1550c0] transition-colors whitespace-nowrap"
@@ -250,7 +246,6 @@ export default function ForYouPage() {
               ))}
             </div>
 
-            {/* Coming soon banner */}
             <div className="mt-4 bg-gradient-to-r from-[#1863e5] to-[#7C3AED] rounded-2xl p-5 flex items-center justify-between">
               <div>
                 <p className="text-white font-semibold text-sm mb-0.5">Хочешь персональный подбор?</p>
@@ -267,15 +262,40 @@ export default function ForYouPage() {
         </div>
       </div>
 
-      {/* Modals */}
       {modal === "auth" && (
-        <AuthModal onClose={() => setModal(null)} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-8 text-center">
+            <h3 className="text-xl font-black text-[#171923] mb-2" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
+              Вход в аккаунт
+            </h3>
+            <p className="text-sm text-[#718096] mb-6">Чтобы отправить запрос, нужно авторизоваться</p>
+            <div className="flex gap-2">
+              <SignInButton mode="modal">
+                <button className="flex-1 rounded-xl bg-[#1863e5] text-white font-semibold py-3 hover:bg-[#1550c0] transition-colors">
+                  Войти
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className="flex-1 rounded-xl border border-gray-200 text-[#171923] font-semibold py-3 hover:bg-gray-50 transition-colors">
+                  Регистрация
+                </button>
+              </SignUpButton>
+            </div>
+            <button
+              onClick={() => setModal(null)}
+              className="text-sm text-[#A0AEC0] hover:text-[#718096] transition-colors mt-4"
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
       )}
-      {modal === "onboarding" && user && (
+      {modal === "onboarding" && (
         <OnboardingModal
-          userId={user.id}
-          firstName={user.firstName}
-          onClose={() => setModal(null)}
+          onClose={() => {
+            setHasProfile(true);
+            setModal(null);
+          }}
         />
       )}
       {modal === "payment" && selectedVacancy && (
@@ -320,9 +340,7 @@ export default function ForYouPage() {
             <p className="font-semibold text-[#171923] mb-4">
               {selectedVacancy.title} в {selectedVacancy.companyName}
             </p>
-            <p className="text-sm text-[#718096] mb-6">
-              Уведомим тебя в течение 1–3 рабочих дней
-            </p>
+            <p className="text-sm text-[#718096] mb-6">Уведомим тебя в течение 1–3 рабочих дней</p>
             <button
               onClick={() => setModal(null)}
               className="w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors"

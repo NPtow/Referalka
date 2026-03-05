@@ -1,21 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
-import { getUser } from "@/lib/auth";
+import { Show, SignInButton, SignUpButton } from "@clerk/nextjs";
 
 export default function Hero() {
-  const [hasProfile, setHasProfile] = useState(false);
-
-  useEffect(() => {
-    const u = getUser();
-    if (u?.profile) setHasProfile(true);
-  }, []);
-
-  const scrollToReg = () => {
-    document.getElementById("registration")?.scrollIntoView({ behavior: "smooth" });
-  };
-
   return (
     <section className="bg-[#F7FAFC] flex flex-col items-center justify-center px-4 pt-28 pb-20 text-center relative overflow-hidden">
       <h1
@@ -32,15 +20,21 @@ export default function Hero() {
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
-        {hasProfile ? (
+        <Show when="signed-in">
           <Link href="/profile">
             <Button size="lg">Открыть мой профиль →</Button>
           </Link>
-        ) : (
-          <Button size="lg" onClick={scrollToReg}>
-            Получить реферал →
-          </Button>
-        )}
+        </Show>
+        <Show when="signed-out">
+          <SignUpButton mode="modal">
+            <Button size="lg">Получить реферал →</Button>
+          </SignUpButton>
+          <SignInButton mode="modal">
+            <button className="text-sm font-medium text-gray-500 hover:text-[#1863e5] transition-colors px-4 py-2">
+              Уже есть аккаунт
+            </button>
+          </SignInButton>
+        </Show>
         <Link
           href="/referrer"
           className="text-sm font-medium text-gray-500 hover:text-[#1863e5] transition-colors px-4 py-2"

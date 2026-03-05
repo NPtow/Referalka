@@ -6,23 +6,14 @@ import { useUser } from "@clerk/nextjs";
 export default function ClerkSessionBridge() {
   const { isLoaded, isSignedIn, user } = useUser();
   const syncedForUser = useRef<string | null>(null);
-  const clearedOnSignOut = useRef(false);
 
   useEffect(() => {
     if (!isLoaded) return;
 
     if (!isSignedIn) {
       syncedForUser.current = null;
-      if (clearedOnSignOut.current) return;
-      clearedOnSignOut.current = true;
-
-      fetch("/api/auth/logout", { method: "POST" }).catch(() => {
-        // ignore: best-effort cleanup
-      });
       return;
     }
-
-    clearedOnSignOut.current = false;
 
     const clerkUserId = user?.id ?? "signed-in";
     if (syncedForUser.current === clerkUserId) return;

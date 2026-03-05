@@ -3,33 +3,38 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Button from "@/components/ui/Button";
-import { getUser } from "@/lib/auth";
+import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
 
 const showMarketplace = process.env.NEXT_PUBLIC_SHOW_MARKETPLACE === "true";
 const showForYou = process.env.NEXT_PUBLIC_SHOW_FOR_YOU === "true";
 
+function getDisplayName(user: ReturnType<typeof useUser>["user"]): string {
+  return (
+    user?.firstName?.trim() ||
+    user?.username?.trim() ||
+    user?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
+    "U"
+  );
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const isHome = pathname === "/";
-  const [user, setUser] = useState<{ firstName: string } | null>(null);
+  const { isSignedIn, user } = useUser();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const displayName = getDisplayName(user);
 
-  useEffect(() => {
-    const u = getUser();
-    if (u) setUser(u);
-  }, []);
-
-  // Close mobile menu on navigation
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  // Lock body scroll when mobile menu is open
   useEffect(() => {
     document.body.style.overflow = mobileMenuOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [mobileMenuOpen]);
 
   useEffect(() => {
@@ -42,7 +47,6 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Determine active states
   const isCompaniesActive = pathname.startsWith("/companies");
   const isRequestsActive = pathname.startsWith("/requests");
   const isDashboardActive = pathname === "/dashboard";
@@ -51,14 +55,13 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
       <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
         <Link
-          href={user ? "/dashboard" : "/"}
+          href={isSignedIn ? "/dashboard" : "/"}
           className="text-[#171923] font-black text-lg hover:text-[#1863e5] transition-colors"
           style={{ fontFamily: "'Inter Tight', sans-serif" }}
         >
           Рефералка
         </Link>
 
-        {/* Burger button — mobile only */}
         <button
           className="md:hidden flex items-center justify-center w-10 h-10 rounded-lg text-[#171923] hover:bg-gray-100 transition-colors"
           onClick={() => setMobileMenuOpen(true)}
@@ -69,9 +72,8 @@ export default function Navbar() {
           </svg>
         </button>
 
-        {/* Desktop navigation — hidden on mobile */}
         <div className="hidden md:flex items-center gap-1">
-          {user && (
+          {isSignedIn && (
             <Link
               href="/dashboard"
               className={`text-sm px-3 py-1.5 rounded-lg transition-colors font-medium ${
@@ -91,7 +93,7 @@ export default function Navbar() {
             Компании
           </Link>
 
-          {user && (
+          {isSignedIn && (
             <Link
               href="/requests"
               className={`text-sm px-3 py-1.5 rounded-lg transition-colors font-medium ${
@@ -102,7 +104,6 @@ export default function Navbar() {
             </Link>
           )}
 
-          {/* Hidden: Marketplace (behind flag) */}
           {showMarketplace && (
             <div className="relative" ref={dropdownRef}>
               <button
@@ -121,14 +122,16 @@ export default function Navbar() {
               {dropdownOpen && (
                 <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 p-3 z-50">
                   <Link href="/marketplace" onClick={() => setDropdownOpen(false)} className="flex items-start gap-3 px-3 py-3 rounded-xl hover:bg-[#F7FAFC] transition-colors">
-                    <div><p className="text-sm font-bold text-[#171923] mb-0.5">Маркетплейс рефереров</p><p className="text-xs text-[#718096]">Выберите проверенного реферера</p></div>
+                    <div>
+                      <p className="text-sm font-bold text-[#171923] mb-0.5">Маркетплейс рефереров</p>
+                      <p className="text-xs text-[#718096]">Выберите проверенного реферера</p>
+                    </div>
                   </Link>
                 </div>
               )}
             </div>
           )}
 
-          {/* Hidden: For You (behind flag) */}
           {showForYou && (
             <Link
               href="/for-you"
@@ -150,7 +153,7 @@ export default function Navbar() {
             </button>
           )}
 
-          {user ? (
+          {isSignedIn ? (
             <Link
               href="/profile"
               className={`flex items-center gap-2 text-sm font-semibold transition-colors ml-2 ${
@@ -158,26 +161,25 @@ export default function Navbar() {
               }`}
             >
               <span className="w-8 h-8 rounded-full bg-[#1863e5] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
-                {user.firstName[0]}
+                {displayName[0]?.toUpperCase() || "U"}
               </span>
               Профиль
             </Link>
-          ) : isHome ? (
-            <Button
-              size="sm"
-              onClick={() => document.getElementById("registration")?.scrollIntoView({ behavior: "smooth" })}
-            >
-              Начать
-            </Button>
           ) : (
-            <Link href="/#registration">
-              <Button size="sm">Начать</Button>
-            </Link>
+            <div className="ml-2 flex items-center gap-2">
+              <SignInButton mode="modal">
+                <button className="text-sm text-gray-500 hover:text-[#171923] transition-colors px-2 py-1.5">
+                  Войти
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <Button size="sm">{isHome ? "Начать" : "Регистрация"}</Button>
+              </SignUpButton>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Mobile menu overlay */}
       <div
         className={`fixed inset-0 z-50 md:hidden transition-opacity duration-300 ${
           mobileMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
@@ -189,9 +191,10 @@ export default function Navbar() {
             mobileMenuOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          {/* Header */}
           <div className="flex items-center justify-between px-4 h-16 border-b border-gray-200">
-            <span className="text-[#171923] font-black text-lg" style={{ fontFamily: "'Inter Tight', sans-serif" }}>Рефералка</span>
+            <span className="text-[#171923] font-black text-lg" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
+              Рефералка
+            </span>
             <button
               className="flex items-center justify-center w-10 h-10 rounded-lg text-[#171923] hover:bg-gray-100 transition-colors"
               onClick={() => setMobileMenuOpen(false)}
@@ -203,9 +206,8 @@ export default function Navbar() {
             </button>
           </div>
 
-          {/* Links */}
           <div className="px-4 py-4 flex flex-col gap-1">
-            {user && (
+            {isSignedIn && (
               <Link
                 href="/dashboard"
                 onClick={() => setMobileMenuOpen(false)}
@@ -227,7 +229,7 @@ export default function Navbar() {
               Компании
             </Link>
 
-            {user && (
+            {isSignedIn && (
               <Link
                 href="/requests"
                 onClick={() => setMobileMenuOpen(false)}
@@ -239,14 +241,26 @@ export default function Navbar() {
               </Link>
             )}
 
-            {/* Hidden items behind flags */}
             {showMarketplace && (
-              <Link href="/marketplace" onClick={() => setMobileMenuOpen(false)} className={`text-base font-medium px-3 py-3 rounded-xl transition-colors ${pathname.startsWith("/marketplace") ? "text-[#1863e5] bg-[#EBF4FF]" : "text-[#171923] hover:bg-gray-50"}`}>
+              <Link
+                href="/marketplace"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`text-base font-medium px-3 py-3 rounded-xl transition-colors ${
+                  pathname.startsWith("/marketplace") ? "text-[#1863e5] bg-[#EBF4FF]" : "text-[#171923] hover:bg-gray-50"
+                }`}
+              >
                 Маркетплейс
               </Link>
             )}
+
             {showForYou && (
-              <Link href="/for-you" onClick={() => setMobileMenuOpen(false)} className={`flex items-center gap-2 text-base font-medium px-3 py-3 rounded-xl transition-colors ${pathname.startsWith("/for-you") ? "text-[#1863e5] bg-[#EBF4FF]" : "text-[#171923] hover:bg-gray-50"}`}>
+              <Link
+                href="/for-you"
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-2 text-base font-medium px-3 py-3 rounded-xl transition-colors ${
+                  pathname.startsWith("/for-you") ? "text-[#1863e5] bg-[#EBF4FF]" : "text-[#171923] hover:bg-gray-50"
+                }`}
+              >
                 Для тебя
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-[#1863e5] to-[#7C3AED] text-white leading-none">New</span>
               </Link>
@@ -266,31 +280,28 @@ export default function Navbar() {
 
             <div className="h-px bg-gray-200 my-2" />
 
-            {user ? (
+            {isSignedIn ? (
               <Link
                 href="/profile"
                 onClick={() => setMobileMenuOpen(false)}
                 className="flex items-center gap-3 px-3 py-3 rounded-xl hover:bg-gray-50 transition-colors"
               >
                 <span className="w-9 h-9 rounded-full bg-[#1863e5] text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
-                  {user.firstName[0]}
+                  {displayName[0]?.toUpperCase() || "U"}
                 </span>
-                <span className="text-base font-semibold text-[#171923]">{user.firstName}</span>
+                <span className="text-base font-semibold text-[#171923]">{displayName}</span>
               </Link>
-            ) : isHome ? (
-              <button
-                className="mt-2"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  document.getElementById("registration")?.scrollIntoView({ behavior: "smooth" });
-                }}
-              >
-                <Button size="sm" className="w-full">Начать</Button>
-              </button>
             ) : (
-              <Link href="/#registration" onClick={() => setMobileMenuOpen(false)} className="mt-2">
-                <Button size="sm" className="w-full">Начать</Button>
-              </Link>
+              <div className="mt-2 flex flex-col gap-2">
+                <SignUpButton mode="modal">
+                  <Button size="sm" className="w-full">Начать</Button>
+                </SignUpButton>
+                <SignInButton mode="modal">
+                  <button className="w-full rounded-xl border border-gray-200 py-2.5 text-sm font-medium text-[#4A5568] hover:bg-[#F7FAFC] transition-colors">
+                    Войти
+                  </button>
+                </SignInButton>
+              </div>
             )}
           </div>
         </div>

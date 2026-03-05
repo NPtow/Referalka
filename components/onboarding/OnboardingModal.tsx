@@ -1,15 +1,13 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { saveUser } from "@/lib/auth";
+import { useUser } from "@clerk/nextjs";
 import Step1Companies from "./Step1Companies";
 import Step2Resume from "./Step2Resume";
 import Step3RoleExp from "./Step3RoleExp";
 import Step4Card from "./Step4Card";
 
 interface Props {
-  userId: number;
-  firstName: string;
   onClose: () => void;
   onError?: () => void;
 }
@@ -26,8 +24,9 @@ export interface OnboardingData {
 
 const STEPS = ["Компании", "Ссылки", "Роль", "Карточка"];
 
-export default function OnboardingModal({ userId, firstName, onClose, onError }: Props) {
+export default function OnboardingModal({ onClose, onError }: Props) {
   const router = useRouter();
+  const { user } = useUser();
   const [step, setStep] = useState(0);
   const [submitError, setSubmitError] = useState("");
   const [data, setData] = useState<OnboardingData>({
@@ -50,11 +49,10 @@ export default function OnboardingModal({ userId, firstName, onClose, onError }:
       const res = await fetch("/api/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, ...finalData }),
+        body: JSON.stringify(finalData),
       });
       const json = await res.json();
       if (json.profile) {
-        saveUser({ id: userId, firstName, profile: json.profile });
         setProfileId(json.profile.id);
         setStep(3);
       } else {
@@ -115,7 +113,12 @@ export default function OnboardingModal({ userId, firstName, onClose, onError }:
           )}
           {step === 3 && (
             <Step4Card
-              firstName={firstName}
+              firstName={
+                user?.firstName?.trim() ||
+                user?.username?.trim() ||
+                user?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
+                "Пользователь"
+              }
               data={data}
               profileId={profileId}
               onClose={() => {

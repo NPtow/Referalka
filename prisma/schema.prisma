@@ -9,6 +9,7 @@ datasource db {
 
 model User {
   id        Int       @id
+  clerkUserId String? @unique
   username  String?
   firstName String
   photoUrl  String?
@@ -58,13 +59,6 @@ model Referrer {
   linkedinUrl String?
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id])
-}
-
-model PendingAuth {
-  token     String   @id @default(uuid())
-  userId    Int?
-  expiresAt DateTime
-  createdAt DateTime @default(now())
 }
 
 model Vacancy {

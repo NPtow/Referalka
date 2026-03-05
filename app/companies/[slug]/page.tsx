@@ -3,10 +3,9 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
 import { COMPANIES_META } from "@/lib/constants";
-import { getUser, StoredUser } from "@/lib/auth";
 import VacancyCard from "@/components/ui/VacancyCard";
-import AuthModal from "@/components/AuthModal";
 import OnboardingModal from "@/components/onboarding/OnboardingModal";
 
 interface Vacancy {
@@ -29,48 +28,72 @@ type ModalState = null | "auth" | "onboarding" | "payment" | "success" | "referr
 export default function CompanyPage() {
   const { slug } = useParams<{ slug: string }>();
   const company = COMPANIES_META.find((c) => c.slug === slug);
+  const { isSignedIn } = useUser();
 
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState("Все");
   const [levelFilter, setLevelFilter] = useState("Все");
   const [modal, setModal] = useState<ModalState>(null);
-  const [user, setUser] = useState<StoredUser | null>(null);
+  const [hasProfile, setHasProfile] = useState(false);
   const [selectedVacancy, setSelectedVacancy] = useState<Vacancy | null>(null);
   const [requesting, setRequesting] = useState(false);
-
-  useEffect(() => {
-    setUser(getUser());
-  }, []);
 
   useEffect(() => {
     if (!slug) return;
     fetch(`/api/vacancies?company=${slug}`)
       .then((r) => r.json())
-      .then((d) => { setVacancies(d.vacancies ?? []); setLoading(false); });
+      .then((d) => {
+        setVacancies(d.vacancies ?? []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [slug]);
+
+  useEffect(() => {
+    if (!isSignedIn) {
+      setHasProfile(false);
+      return;
+    }
+
+    fetch("/api/profile")
+      .then(async (r) => {
+        if (!r.ok) return null;
+        const data = await r.json();
+        return data.profile ?? null;
+      })
+      .then((profile) => {
+        setHasProfile(Boolean(profile));
+      })
+      .catch(() => {
+        setHasProfile(false);
+      });
+  }, [isSignedIn]);
 
   const handleRequest = (vacancy: Vacancy) => {
     setSelectedVacancy(vacancy);
-    const currentUser = getUser();
-    if (!currentUser) {
+    if (!isSignedIn) {
       setModal("auth");
-    } else if (!currentUser.profile && process.env.NEXT_PUBLIC_SHOW_ONBOARDING === "true") {
+    } else if (!hasProfile && process.env.NEXT_PUBLIC_SHOW_ONBOARDING === "true") {
       setModal("onboarding");
-    } else if (!currentUser.profile) {
-      // Onboarding hidden — redirect to profile
+    } else if (!hasProfile) {
       window.location.href = "/profile";
-      return;
     } else {
       setModal("payment");
     }
   };
 
   const handleRequestReferral = async () => {
-    const currentUser = getUser();
-    if (!currentUser) { setModal("auth"); return; }
-    if (!currentUser.profile) { setModal("need-profile"); return; }
+    if (!isSignedIn) {
+      setModal("auth");
+      return;
+    }
+    if (!hasProfile) {
+      setModal("need-profile");
+      return;
+    }
     if (!company) return;
+
     setRequesting(true);
     try {
       const res = await fetch("/api/requests", {
@@ -78,7 +101,6 @@ export default function CompanyPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ companySlug: company.slug, companyName: company.name }),
       });
-      const json = await res.json();
       if (res.ok || res.status === 409) {
         setModal("referral-sent");
       }
@@ -109,7 +131,6 @@ export default function CompanyPage() {
       <div className="h-16" />
 
       <div className="max-w-4xl mx-auto px-4 py-12">
-        {/* Breadcrumb */}
         <div className="text-sm text-[#A0AEC0] mb-6">
           <Link href="/" className="hover:text-[#1863e5] transition-colors">Главная</Link>
           <span className="mx-2">/</span>
@@ -118,7 +139,6 @@ export default function CompanyPage() {
           <span className="text-[#718096]">{company.name}</span>
         </div>
 
-        {/* Company header */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
           <div className="flex items-start gap-4">
             {company.logoPath ? (
@@ -172,14 +192,12 @@ export default function CompanyPage() {
           </div>
         </div>
 
-        {/* Vacancies */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-black text-[#171923]" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
             Вакансии {!loading && <span className="text-[#A0AEC0] font-normal text-base">({vacancies.length})</span>}
           </h2>
         </div>
 
-        {/* Filters */}
         <div className="flex flex-wrap gap-2 mb-5">
           <div className="flex gap-1">
             {TYPE_FILTER.map((t) => (
@@ -222,21 +240,44 @@ export default function CompanyPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 text-[#A0AEC0]">
-            Вакансий с такими фильтрами нет
-          </div>
+          <div className="text-center py-16 text-[#A0AEC0]">Вакансий с такими фильтрами нет</div>
         )}
       </div>
 
-      {/* Modals */}
       {modal === "auth" && (
-        <AuthModal onClose={() => setModal(null)} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-8 text-center">
+            <h3 className="text-xl font-black text-[#171923] mb-2" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
+              Войди в аккаунт
+            </h3>
+            <p className="text-sm text-[#718096] mb-6">Чтобы отправить запрос, нужно авторизоваться</p>
+            <div className="flex gap-2">
+              <SignInButton mode="modal">
+                <button className="flex-1 rounded-xl bg-[#1863e5] text-white font-semibold py-3 hover:bg-[#1550c0] transition-colors">
+                  Войти
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className="flex-1 rounded-xl border border-gray-200 text-[#171923] font-semibold py-3 hover:bg-gray-50 transition-colors">
+                  Регистрация
+                </button>
+              </SignUpButton>
+            </div>
+            <button
+              onClick={() => setModal(null)}
+              className="text-sm text-[#A0AEC0] hover:text-[#718096] transition-colors mt-4"
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
       )}
-      {modal === "onboarding" && user && (
+      {modal === "onboarding" && (
         <OnboardingModal
-          userId={user.id}
-          firstName={user.firstName}
-          onClose={() => setModal(null)}
+          onClose={() => {
+            setModal(null);
+            setHasProfile(true);
+          }}
         />
       )}
       {modal === "payment" && (
@@ -277,13 +318,9 @@ export default function CompanyPage() {
             <h3 className="text-xl font-black text-[#171923] mb-2" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
               Заявка принята!
             </h3>
-            <p className="text-sm text-[#718096] mb-1">
-              Ищем реферера для вакансии:
-            </p>
+            <p className="text-sm text-[#718096] mb-1">Ищем реферера для вакансии:</p>
             <p className="font-semibold text-[#171923] mb-4">{selectedVacancy?.title} в {company.name}</p>
-            <p className="text-sm text-[#718096] mb-6">
-              Уведомим тебя в течение 1–3 рабочих дней
-            </p>
+            <p className="text-sm text-[#718096] mb-6">Уведомим тебя в течение 1–3 рабочих дней</p>
             <button
               onClick={() => setModal(null)}
               className="w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors"
@@ -300,9 +337,7 @@ export default function CompanyPage() {
             <h3 className="text-xl font-black text-[#171923] mb-2" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
               Заявка отправлена!
             </h3>
-            <p className="text-sm text-[#718096] mb-6">
-              Мы напишем в Telegram когда найдём реферера в {company.name}
-            </p>
+            <p className="text-sm text-[#718096] mb-6">Мы напишем в Telegram когда найдём реферера в {company.name}</p>
             <button
               onClick={() => setModal(null)}
               className="w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors"
