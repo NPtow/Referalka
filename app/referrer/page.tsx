@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { getUser, StoredUser } from "@/lib/auth";
 import { COMPANIES_META } from "@/lib/constants";
+import TelegramLoginButton from "@/components/TelegramLoginButton";
 
 export default function ReferrerPage() {
   const router = useRouter();
@@ -18,12 +19,6 @@ export default function ReferrerPage() {
     const u = getUser();
     if (u) setUser(u);
   }, []);
-
-  const handleLogin = async () => {
-    const res = await fetch("/api/auth/telegram/url");
-    const { url } = await res.json();
-    window.location.href = url;
-  };
 
   const handleSave = async () => {
     if (!user || !company) return;
@@ -62,15 +57,7 @@ export default function ReferrerPage() {
             <div>
               <p className="text-sm text-[#4A5568] mb-4 text-center">Войди через Telegram, чтобы продолжить</p>
               <div className="flex justify-center">
-                <button
-                  onClick={handleLogin}
-                  className="flex items-center gap-2.5 px-6 py-3 bg-[#229ED9] hover:bg-[#1a8bc4] text-white font-semibold rounded-xl transition-colors text-sm"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.26 13.432l-2.939-.917c-.638-.203-.651-.638.136-.944l11.47-4.42c.53-.194.994.13.967.07z"/>
-                  </svg>
-                  Войти через Telegram
-                </button>
+                <TelegramLoginButton />
               </div>
               <p className="text-xs text-[#A0AEC0] mt-4 text-center">Мы не храним лишнего. Только имя и username из Telegram</p>
             </div>
