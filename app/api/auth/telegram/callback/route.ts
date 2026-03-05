@@ -1,56 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyTelegramHash, OAuthTelegramUser } from "@/lib/telegram";
 import { signJWT } from "@/lib/jwt";
+import { jwtVerify, createRemoteJWKSet } from "jose";
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+const TELEGRAM_JWKS = createRemoteJWKSet(
+  new URL("https://oauth.telegram.org/.well-known/jwks.json")
+);
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+export async function POST(request: NextRequest) {
   const appUrl = process.env.APP_URL!;
 
-  const tgUser: OAuthTelegramUser = {
-    id: Number(searchParams.get("id")),
-    first_name: searchParams.get("first_name") ?? "",
-    ...(searchParams.get("last_name") && { last_name: searchParams.get("last_name")! }),
-    ...(searchParams.get("username") && { username: searchParams.get("username")! }),
-    ...(searchParams.get("photo_url") && { photo_url: searchParams.get("photo_url")! }),
-    auth_date: Number(searchParams.get("auth_date")),
-    hash: searchParams.get("hash") ?? "",
-  };
-
-  if (!verifyTelegramHash(tgUser)) {
-    console.error("[TG OAuth] HMAC failed for id:", tgUser.id);
-    return NextResponse.redirect(`${appUrl}/?auth_error=invalid`);
-  }
-
   try {
+    const { id_token } = await request.json();
+    if (!id_token) {
+      return NextResponse.json({ redirect: `${appUrl}/?auth_error=invalid` }, { status: 400 });
+    }
+
+    // Verify id_token signature via Telegram JWKS and validate claims
+    const { payload } = await jwtVerify(id_token, TELEGRAM_JWKS, {
+      issuer: "https://oauth.telegram.org",
+      audience: process.env.NEXT_PUBLIC_TELEGRAM_CLIENT_ID!,
+    });
+
+    const tgId = payload.id as number;
+    const firstName = (payload.name as string) ?? "User";
+    const username = (payload.preferred_username as string) ?? null;
+    const photoUrl = (payload.picture as string) ?? null;
+
+    if (!tgId) {
+      console.error("[TG OIDC] No id in token payload");
+      return NextResponse.json({ redirect: `${appUrl}/?auth_error=invalid` });
+    }
+
     const user = await prisma.user.upsert({
-      where: { id: tgUser.id },
-      update: {
-        firstName: tgUser.first_name,
-        username: tgUser.username ?? null,
-        photoUrl: tgUser.photo_url ?? null,
-      },
-      create: {
-        id: tgUser.id,
-        firstName: tgUser.first_name,
-        username: tgUser.username ?? null,
-        photoUrl: tgUser.photo_url ?? null,
-      },
+      where: { id: tgId },
+      update: { firstName, username, photoUrl },
+      create: { id: tgId, firstName, username, photoUrl },
       include: { profile: true },
     });
 
-    console.log("[TG OAuth] Success. User id:", user.id);
+    console.log("[TG OIDC] Success. User id:", user.id);
 
     const token = await signJWT({ userId: user.id });
     const userInfo = { id: user.id, firstName: user.firstName, profile: user.profile ?? null };
 
-    // Redirect: new users or no profile → /profile, otherwise → /dashboard
     const redirectPath = user.profile ? "/dashboard" : "/profile";
-    const response = NextResponse.redirect(`${appUrl}${redirectPath}`);
 
-    // Secure JWT for server-side auth checks and middleware
+    // Set cookies via headers since this is a JSON response
+    const response = NextResponse.json({ redirect: redirectPath });
+
     response.cookies.set("auth_token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -59,7 +58,6 @@ export async function GET(request: NextRequest) {
       path: "/",
     });
 
-    // Non-httpOnly cookie for client-side user info display
     response.cookies.set("tg_user", encodeURIComponent(JSON.stringify(userInfo)), {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
@@ -70,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (err) {
-    console.error("[TG OAuth] DB error:", err);
-    return NextResponse.redirect(`${appUrl}/?auth_error=db`);
+    console.error("[TG OIDC] Error:", err);
+    return NextResponse.json({ redirect: `/?auth_error=invalid` }, { status: 401 });
   }
 }
