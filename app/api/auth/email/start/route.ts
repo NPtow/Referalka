@@ -99,10 +99,20 @@ export async function POST(req: NextRequest) {
     await prisma.pendingAuth.deleteMany({ where: { userId: user.id } });
     const pending = await createPendingCode(user.id, expiresAt);
 
-    const sent = await sendAuthCodeEmail(normalizedEmail, pending.token);
-    if (!sent) {
+    const sendResult = await sendAuthCodeEmail(normalizedEmail, pending.token);
+    if (!sendResult.ok) {
+      const reason = sendResult.error ?? "unknown";
+      const hint =
+        reason.includes("resend.dev") || reason.includes("You can only send testing emails")
+          ? "С onboarding@resend.dev можно слать только на email владельца аккаунта Resend."
+          : reason.includes("Invalid API key")
+            ? "Проверь RESEND_API_KEY в Vercel."
+            : reason.includes("verify a domain")
+              ? "Проверь верификацию домена и EMAIL_FROM в Resend."
+              : "Проверь RESEND_API_KEY и EMAIL_FROM в Vercel.";
+
       return NextResponse.json(
-        { error: "Не удалось отправить письмо. Проверь настройки EMAIL_FROM и RESEND_API_KEY." },
+        { error: `Не удалось отправить письмо: ${reason}. ${hint}` },
         { status: 500 }
       );
     }

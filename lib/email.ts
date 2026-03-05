@@ -1,10 +1,15 @@
-export async function sendAuthCodeEmail(email: string, code: string): Promise<boolean> {
+export interface SendEmailResult {
+  ok: boolean;
+  error?: string;
+}
+
+export async function sendAuthCodeEmail(email: string, code: string): Promise<SendEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
 
   if (!apiKey || !from) {
     console.error("[Email Auth] Missing RESEND_API_KEY or EMAIL_FROM");
-    return false;
+    return { ok: false, error: "Missing RESEND_API_KEY or EMAIL_FROM" };
   }
 
   try {
@@ -27,16 +32,21 @@ export async function sendAuthCodeEmail(email: string, code: string): Promise<bo
       | null;
 
     if (!response.ok) {
+      const reason = payload?.error?.message ?? payload?.message ?? response.statusText;
       console.error(
         "[Email Auth] Failed to send email:",
-        payload?.error?.message ?? payload?.message ?? response.statusText
+        reason
       );
-      return false;
+      return { ok: false, error: reason };
     }
 
-    return Boolean(payload?.id);
+    if (!payload?.id) {
+      return { ok: false, error: "Resend returned no email id" };
+    }
+
+    return { ok: true };
   } catch (err) {
     console.error("[Email Auth] Network error:", err);
-    return false;
+    return { ok: false, error: "Network error while sending email" };
   }
 }
