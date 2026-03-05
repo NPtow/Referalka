@@ -6,9 +6,14 @@ interface Props {
 
 export default function AuthModal({ onClose }: Props) {
   const handleLogin = async () => {
-    const res = await fetch("/api/auth/telegram/url");
-    const { url } = await res.json();
-    window.location.href = url;
+    try {
+      const res = await fetch("/api/auth/telegram/url");
+      const data = await res.json();
+      if (!data.url) throw new Error(data.error || "No URL returned");
+      window.location.href = data.url;
+    } catch (e) {
+      alert("Ошибка авторизации: " + (e as Error).message);
+    }
   };
 
   return (
