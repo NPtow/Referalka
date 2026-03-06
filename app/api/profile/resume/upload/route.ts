@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { resolveCurrentAppUser } from "@/lib/resolve-current-app-user";
 
+export const runtime = "nodejs";
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (buf: Buffer) => Promise<{ text: string }>;
 
@@ -9,6 +11,23 @@ const MAX_SIZE_BYTES = 15 * 1024 * 1024;
 
 function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function resolveUploadErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    const message = err.message || "";
+    if (message.includes("BLOB_READ_WRITE_TOKEN")) {
+      return "Сервер не настроен: отсутствует BLOB_READ_WRITE_TOKEN.";
+    }
+    if (message.toLowerCase().includes("invalid token")) {
+      return "Сервер не настроен: некорректный BLOB_READ_WRITE_TOKEN.";
+    }
+    if (message.toLowerCase().includes("unauthorized")) {
+      return "Сервер не авторизован в Vercel Blob. Проверь BLOB_READ_WRITE_TOKEN.";
+    }
+    return message;
+  }
+  return "Не удалось загрузить резюме";
 }
 
 async function parseResumeText(file: File, buffer: Buffer): Promise<string | null> {
@@ -36,6 +55,12 @@ export async function POST(req: NextRequest) {
   try {
     const appUser = await resolveCurrentAppUser();
     if (!appUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      return NextResponse.json(
+        { error: "Сервер не настроен: отсутствует BLOB_READ_WRITE_TOKEN." },
+        { status: 500 }
+      );
+    }
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -58,14 +83,20 @@ export async function POST(req: NextRequest) {
 
     const blob = await put(
       `resumes/${appUser.id}/${Date.now()}-${sanitizeFileName(file.name)}`,
-      file,
+      buffer,
       {
         access: "public",
         addRandomSuffix: true,
+        contentType: file.type || undefined,
       }
     );
 
-    const parsedText = await parseResumeText(file, buffer);
+    let parsedText: string | null = null;
+    try {
+      parsedText = await parseResumeText(file, buffer);
+    } catch (parseError) {
+      console.warn("[Profile Resume Upload] Text parse failed:", parseError);
+    }
 
     return NextResponse.json({
       resumeFileUrl: blob.url,
@@ -76,6 +107,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("[Profile Resume Upload]", err);
-    return NextResponse.json({ error: "Не удалось загрузить резюме" }, { status: 500 });
+    return NextResponse.json({ error: resolveUploadErrorMessage(err) }, { status: 500 });
   }
 }
