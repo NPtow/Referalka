@@ -71,8 +71,28 @@ export async function sendApplicationEmail(params: {
   });
 
   if (!response.ok) {
+    const contentType = response.headers.get("content-type") || "";
+    const statusLabel = `HTTP ${response.status}`;
+
+    if (contentType.includes("application/json")) {
+      const payload = await response
+        .json()
+        .catch(() => null) as
+        | { message?: string; error?: string; errors?: unknown }
+        | null;
+
+      const message =
+        (payload && typeof payload.message === "string" && payload.message) ||
+        (payload && typeof payload.error === "string" && payload.error) ||
+        (payload && Array.isArray(payload.errors) && payload.errors.map((x) => String(x)).join("; ")) ||
+        "";
+
+      return { ok: false, error: message ? `${statusLabel}: ${message}` : statusLabel };
+    }
+
     const text = await response.text().catch(() => "");
-    return { ok: false, error: text || response.statusText };
+    const shortText = text.length > 400 ? `${text.slice(0, 400)}...` : text;
+    return { ok: false, error: shortText ? `${statusLabel}: ${shortText}` : statusLabel };
   }
 
   return { ok: true };

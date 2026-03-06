@@ -289,7 +289,11 @@ export default function ProfilePage() {
       const json = await res.json();
 
       if (!res.ok || !json.ok) {
-        setError(json.error ?? "Не удалось отправить заявку.");
+        const details =
+          typeof json.details === "string" && json.details.trim().length
+            ? ` Детали: ${json.details}`
+            : "";
+        setError(`${json.error ?? "Не удалось отправить заявку."}${details}`);
         return;
       }
 
