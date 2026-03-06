@@ -14,7 +14,7 @@ export default function Hero() {
         от реального сотрудника.
       </h1>
 
-      <p className="text-lg text-gray-500 max-w-xl mb-8 leading-relaxed">
+      <p className="text-lg text-[#4A5568] max-w-xl mb-8 leading-relaxed">
         Кандидаты с рефералом на 40% чаще получают приглашение на интервью.
         Мы соединяем тебя с сотрудниками ведущих IT-компаний России.
       </p>
@@ -30,14 +30,14 @@ export default function Hero() {
             <Button size="lg">Получить реферал →</Button>
           </SignUpButton>
           <SignInButton mode="modal">
-            <button className="text-sm font-medium text-gray-500 hover:text-[#1863e5] transition-colors px-4 py-2">
+            <button className="text-sm font-medium text-[#4A5568] hover:text-[#1863e5] transition-colors px-4 py-2">
               Уже есть аккаунт
             </button>
           </SignInButton>
         </Show>
         <Link
           href="/referrer"
-          className="text-sm font-medium text-gray-500 hover:text-[#1863e5] transition-colors px-4 py-2"
+          className="text-sm font-medium text-[#4A5568] hover:text-[#1863e5] transition-colors px-4 py-2"
         >
           Стать реферером
         </Link>
@@ -45,10 +45,10 @@ export default function Hero() {
 
       {/* notification previews */}
       <div className="flex flex-col sm:flex-row gap-3 mt-12 text-left">
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-600 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#4A5568] shadow-sm">
           🎉 Тебя зареферили в <strong className="text-[#171923]">Яндекс</strong>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-600 shadow-sm">
+        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#4A5568] shadow-sm">
           👀 Сотрудник <strong className="text-[#171923]">Тинькофф</strong> хочет тебя зареферить
         </div>
       </div>

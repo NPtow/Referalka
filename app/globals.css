@@ -9,6 +9,10 @@
   animation: marquee 30s linear infinite;
 }
 
+.animate-marquee-slow {
+  animation: marquee 42s linear infinite;
+}
+
 * {
   box-sizing: border-box;
 }

@@ -33,6 +33,14 @@ interface ProfileData {
   };
 }
 
+interface ReferrerData {
+  id: string;
+  company: string;
+  linkedinUrl: string | null;
+}
+
+type UserKind = "candidate" | "referrer";
+
 type FormState = {
   roles: string[];
   companies: string[];
@@ -78,6 +86,8 @@ export default function ProfilePage() {
 
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [referrer, setReferrer] = useState<ReferrerData | null>(null);
+  const [userKind, setUserKind] = useState<UserKind>("candidate");
   const [form, setForm] = useState<FormState>({
     roles: [],
     companies: [],
@@ -95,6 +105,10 @@ export default function ProfilePage() {
     bio: "",
     openToRelocation: false,
     isPublic: false,
+  });
+  const [referrerForm, setReferrerForm] = useState({
+    company: "",
+    linkedinUrl: "",
   });
   const [customRole, setCustomRole] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -114,37 +128,57 @@ export default function ProfilePage() {
       return;
     }
 
-    fetch("/api/profile")
-      .then(async (res) => {
-        if (res.status === 404) return null;
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Ошибка загрузки профиля");
-        return json.profile as ProfileData;
-      })
-      .then((loaded) => {
-        if (!loaded) return;
+    Promise.all([
+      fetch("/api/profile"),
+      fetch("/api/referrer"),
+    ])
+      .then(async ([profileRes, referrerRes]) => {
+        let loadedProfile: ProfileData | null = null;
+        if (profileRes.status !== 404) {
+          const json = await profileRes.json();
+          if (!profileRes.ok) throw new Error(json.error ?? "Ошибка загрузки профиля");
+          loadedProfile = json.profile as ProfileData;
+        }
 
-        setProfile(loaded);
-        setForm({
-          roles: loaded.roles?.length ? loaded.roles : [loaded.role],
-          companies: loaded.companies ?? [],
-          experience: loaded.experience ?? 0,
-          location: loaded.location ?? "",
-          resumeUrl: loaded.resumeUrl ?? "",
-          resumeFileUrl: loaded.resumeFileUrl,
-          resumeFileName: loaded.resumeFileName,
-          resumeFileMime: loaded.resumeFileMime,
-          resumeFileSize: loaded.resumeFileSize,
-          resumeText: loaded.resumeText ?? "",
-          linkedinUrl: loaded.linkedinUrl ?? "",
-          githubUrl: loaded.githubUrl ?? "",
-          siteUrl: loaded.siteUrl ?? "",
-          bio: loaded.bio ?? "",
-          openToRelocation: loaded.openToRelocation ?? false,
-          isPublic: loaded.isPublic ?? false,
-        });
-        if (loaded.applicationSubmittedAt) {
-          setSubmitSuccess(`Последняя заявка отправлена: ${formatDate(loaded.applicationSubmittedAt)}`);
+        const referrerJson = await referrerRes.json();
+        if (!referrerRes.ok) throw new Error(referrerJson.error ?? "Ошибка загрузки данных реферала");
+        const loadedReferrer = (referrerJson.referrer ?? null) as ReferrerData | null;
+
+        if (loadedProfile) {
+          setProfile(loadedProfile);
+          setForm({
+            roles: loadedProfile.roles?.length ? loadedProfile.roles : [loadedProfile.role],
+            companies: loadedProfile.companies ?? [],
+            experience: loadedProfile.experience ?? 0,
+            location: loadedProfile.location ?? "",
+            resumeUrl: loadedProfile.resumeUrl ?? "",
+            resumeFileUrl: loadedProfile.resumeFileUrl,
+            resumeFileName: loadedProfile.resumeFileName,
+            resumeFileMime: loadedProfile.resumeFileMime,
+            resumeFileSize: loadedProfile.resumeFileSize,
+            resumeText: loadedProfile.resumeText ?? "",
+            linkedinUrl: loadedProfile.linkedinUrl ?? "",
+            githubUrl: loadedProfile.githubUrl ?? "",
+            siteUrl: loadedProfile.siteUrl ?? "",
+            bio: loadedProfile.bio ?? "",
+            openToRelocation: loadedProfile.openToRelocation ?? false,
+            isPublic: loadedProfile.isPublic ?? false,
+          });
+          if (loadedProfile.applicationSubmittedAt) {
+            setSubmitSuccess(`Последняя заявка отправлена: ${formatDate(loadedProfile.applicationSubmittedAt)}`);
+          }
+        }
+
+        if (loadedReferrer) {
+          setReferrer(loadedReferrer);
+          setReferrerForm({
+            company: loadedReferrer.company ?? "",
+            linkedinUrl: loadedReferrer.linkedinUrl ?? "",
+          });
+          setUserKind("referrer");
+        } else {
+          setReferrer(null);
+          setUserKind("candidate");
         }
       })
       .catch((err) => {
@@ -223,6 +257,10 @@ export default function ProfilePage() {
   });
 
   const validateForm = (): string | null => {
+    if (userKind === "referrer") {
+      if (!referrerForm.company.trim()) return "Укажи компанию, в которой ты можешь реферить.";
+      return null;
+    }
     if (!form.roles.length) return "Выбери хотя бы одну роль.";
     if (!form.companies.length) return "Выбери хотя бы одну компанию.";
     if (!Number.isFinite(form.experience) || form.experience < 0) return "Укажи корректный опыт.";
@@ -281,6 +319,26 @@ export default function ProfilePage() {
     setSubmitting(true);
 
     try {
+      if (userKind === "referrer") {
+        const res = await fetch("/api/referrer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company: referrerForm.company,
+            linkedinUrl: referrerForm.linkedinUrl || null,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.referrer) {
+          setError(json.error ?? "Не удалось сохранить профиль реферала.");
+          return;
+        }
+
+        setReferrer(json.referrer as ReferrerData);
+        setSubmitSuccess("Профиль реферала сохранен.");
+        return;
+      }
+
       const res = await fetch("/api/profile/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -359,10 +417,14 @@ export default function ProfilePage() {
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="bg-[#EBF4FF] border border-[#C3DAFE] rounded-2xl p-5 mb-6">
           <h1 className="text-lg font-black text-[#171923] mb-1" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
-            Заполни профиль, чтобы подать заявку на реферал
+            {userKind === "candidate"
+              ? "Заполни профиль, чтобы подать заявку на реферал"
+              : "Заполни профиль реферала"}
           </h1>
           <p className="text-sm text-[#4A5568]">
-            После нажатия кнопки внизу мы сохраним профиль и отправим заявку владельцу сервиса.
+            {userKind === "candidate"
+              ? "После нажатия кнопки внизу мы сохраним профиль и отправим заявку владельцу сервиса."
+              : "Выбери компанию и заполни данные, чтобы получать обращения от кандидатов."}
           </p>
           {submitSuccess && <p className="text-sm text-green-700 mt-2">{submitSuccess}</p>}
         </div>
@@ -440,239 +502,318 @@ export default function ProfilePage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-          <h3 className="text-base font-bold text-[#171923] mb-4">Обязательные поля</h3>
+          <h3 className="text-base font-bold text-[#171923] mb-2">Кто ты?</h3>
+          <p className="text-sm text-[#4A5568] mb-4">Выбери роль, чтобы увидеть нужные поля.</p>
+          <div className="grid sm:grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setUserKind("candidate");
+                setError(null);
+              }}
+              className={`rounded-xl border px-4 py-3 text-sm font-semibold transition-colors ${
+                userKind === "candidate"
+                  ? "border-[#1863e5] bg-[#EBF4FF] text-[#1863e5]"
+                  : "border-gray-200 text-[#4A5568] hover:bg-gray-50"
+              }`}
+            >
+              Кандидат
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUserKind("referrer");
+                setError(null);
+              }}
+              className={`rounded-xl border px-4 py-3 text-sm font-semibold transition-colors ${
+                userKind === "referrer"
+                  ? "border-[#1863e5] bg-[#EBF4FF] text-[#1863e5]"
+                  : "border-gray-200 text-[#4A5568] hover:bg-gray-50"
+              }`}
+            >
+              Реферал
+            </button>
+          </div>
+        </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-[#4A5568] mb-2">Роли (можно несколько)</label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {ROLES.map((role) => {
-                const active = form.roles.includes(role);
-                return (
+        {userKind === "candidate" ? (
+          <>
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+              <h3 className="text-base font-bold text-[#171923] mb-4">Обязательные поля</h3>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[#4A5568] mb-2">Роли (можно несколько)</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {ROLES.map((role) => {
+                    const active = form.roles.includes(role);
+                    return (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => toggleRole(role)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                          active ? "bg-[#1863e5] text-white" : "bg-[#F7FAFC] text-[#4A5568] hover:bg-[#EBF4FF]"
+                        }`}
+                      >
+                        {role}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={customRole}
+                    onChange={(e) => setCustomRole(e.target.value)}
+                    placeholder="Своя роль"
+                    className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+                  />
                   <button
-                    key={role}
                     type="button"
-                    onClick={() => toggleRole(role)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                      active ? "bg-[#1863e5] text-white" : "bg-[#F7FAFC] text-[#4A5568] hover:bg-[#EBF4FF]"
-                    }`}
+                    onClick={addCustomRole}
+                    className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-[#171923] hover:bg-gray-50 transition-colors"
                   >
-                    {role}
+                    Добавить
                   </button>
-                );
-              })}
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={customRole}
-                onChange={(e) => setCustomRole(e.target.value)}
-                placeholder="Своя роль"
-                className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
-              />
-              <button
-                type="button"
-                onClick={addCustomRole}
-                className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-[#171923] hover:bg-gray-50 transition-colors"
-              >
-                Добавить
-              </button>
-            </div>
-            {form.roles.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {form.roles.map((role) => (
-                  <span key={role} className="inline-flex items-center gap-2 rounded-full bg-[#EBF4FF] px-3 py-1 text-xs font-medium text-[#1863e5]">
-                    {role}
-                    <button type="button" onClick={() => removeRole(role)} className="text-[#1550c0] hover:text-[#0f3d92]">×</button>
-                  </span>
-                ))}
+                </div>
+                {form.roles.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {form.roles.map((role) => (
+                      <span key={role} className="inline-flex items-center gap-2 rounded-full bg-[#EBF4FF] px-3 py-1 text-xs font-medium text-[#1863e5]">
+                        {role}
+                        <button type="button" onClick={() => removeRole(role)} className="text-[#1550c0] hover:text-[#0f3d92]">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Опыт (лет)</label>
-              <input
-                type="number"
-                min={0}
-                max={50}
-                value={form.experience}
-                onChange={(e) => updateForm("experience", Number(e.target.value) || 0)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] outline-none focus:border-[#1863e5]"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Локация</label>
-              <input
-                type="text"
-                value={form.location}
-                onChange={(e) => updateForm("location", e.target.value)}
-                placeholder="Москва"
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
-              />
-            </div>
-          </div>
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Опыт (лет)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={50}
+                    value={form.experience}
+                    onChange={(e) => updateForm("experience", Number(e.target.value) || 0)}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] outline-none focus:border-[#1863e5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Локация</label>
+                  <input
+                    type="text"
+                    value={form.location}
+                    onChange={(e) => updateForm("location", e.target.value)}
+                    placeholder="Москва"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+                  />
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[#4A5568] mb-2">Компании (можно несколько)</label>
-            <div className="max-h-44 overflow-y-auto rounded-xl border border-gray-200 p-3">
-              <div className="flex flex-wrap gap-2">
-                {COMPANIES_META.map((c) => {
-                  const active = form.companies.includes(c.name);
-                  return (
-                    <button
-                      key={c.slug}
-                      type="button"
-                      onClick={() => toggleCompany(c.name)}
-                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                        active ? "bg-[#1863e5] text-white" : "bg-[#F7FAFC] text-[#4A5568] hover:bg-[#EBF4FF]"
-                      }`}
+              <div>
+                <label className="block text-sm font-medium text-[#4A5568] mb-2">Компании (можно несколько)</label>
+                <div className="max-h-44 overflow-y-auto rounded-xl border border-gray-200 p-3">
+                  <div className="flex flex-wrap gap-2">
+                    {COMPANIES_META.map((c) => {
+                      const active = form.companies.includes(c.name);
+                      return (
+                        <button
+                          key={c.slug}
+                          type="button"
+                          onClick={() => toggleCompany(c.name)}
+                          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                            active ? "bg-[#1863e5] text-white" : "bg-[#F7FAFC] text-[#4A5568] hover:bg-[#EBF4FF]"
+                          }`}
+                        >
+                          {c.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+              <h3 className="text-base font-bold text-[#171923] mb-2">Резюме</h3>
+              <p className="text-xs text-[#A0AEC0] mb-4">Нужен хотя бы один способ: файл, ссылка или текст.</p>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[#4A5568] mb-1.5">1) Загрузить файл (PDF/DOCX)</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={handleUploadResume}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-[#171923] hover:bg-gray-50 transition-colors disabled:opacity-60"
+                  >
+                    {uploading ? "Загрузка..." : "Выбрать файл"}
+                  </button>
+                  {form.resumeFileUrl && (
+                    <a
+                      href={form.resumeFileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-[#1863e5] hover:underline"
                     >
-                      {c.name}
-                    </button>
-                  );
-                })}
+                      Открыть файл
+                    </a>
+                  )}
+                </div>
+                {form.resumeFileName && (
+                  <p className="mt-2 text-xs text-[#718096]">
+                    Файл: {form.resumeFileName}
+                    {form.resumeFileMime ? ` · ${form.resumeFileMime}` : ""}
+                    {form.resumeFileSize ? ` · ${humanFileSize(form.resumeFileSize)}` : ""}
+                  </p>
+                )}
+                {uploadError && <p className="mt-1 text-xs text-red-500">{uploadError}</p>}
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[#4A5568] mb-1.5">2) Ссылка на резюме</label>
+                <input
+                  type="url"
+                  value={form.resumeUrl}
+                  onChange={(e) => updateForm("resumeUrl", e.target.value)}
+                  placeholder="https://..."
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#4A5568] mb-1.5">3) Текст резюме</label>
+                <textarea
+                  value={form.resumeText}
+                  onChange={(e) => updateForm("resumeText", e.target.value)}
+                  rows={8}
+                  placeholder="Вставь текст резюме"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5] resize-none"
+                />
               </div>
             </div>
-          </div>
-        </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-          <h3 className="text-base font-bold text-[#171923] mb-2">Резюме</h3>
-          <p className="text-xs text-[#A0AEC0] mb-4">Нужен хотя бы один способ: файл, ссылка или текст.</p>
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+              <h3 className="text-base font-bold text-[#171923] mb-4">Дополнительные данные</h3>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-[#4A5568] mb-1.5">1) Загрузить файл (PDF/DOCX)</label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              onChange={handleUploadResume}
-              className="hidden"
-            />
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-[#171923] hover:bg-gray-50 transition-colors disabled:opacity-60"
-              >
-                {uploading ? "Загрузка..." : "Выбрать файл"}
-              </button>
-              {form.resumeFileUrl && (
-                <a
-                  href={form.resumeFileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-[#1863e5] hover:underline"
-                >
-                  Открыть файл
-                </a>
-              )}
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#4A5568] mb-1.5">LinkedIn</label>
+                  <input
+                    type="url"
+                    value={form.linkedinUrl}
+                    onChange={(e) => updateForm("linkedinUrl", e.target.value)}
+                    placeholder="https://linkedin.com/in/..."
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#4A5568] mb-1.5">GitHub</label>
+                  <input
+                    type="url"
+                    value={form.githubUrl}
+                    onChange={(e) => updateForm("githubUrl", e.target.value)}
+                    placeholder="https://github.com/..."
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Личный сайт</label>
+                  <input
+                    type="url"
+                    value={form.siteUrl}
+                    onChange={(e) => updateForm("siteUrl", e.target.value)}
+                    placeholder="https://..."
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+                  />
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
+                  О себе <span className="text-[#A0AEC0]">({form.bio.length}/700)</span>
+                </label>
+                <textarea
+                  value={form.bio}
+                  onChange={(e) => updateForm("bio", e.target.value.slice(0, 700))}
+                  rows={4}
+                  placeholder="Коротко о себе"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5] resize-none"
+                />
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.openToRelocation}
+                    onChange={(e) => updateForm("openToRelocation", e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-[#4A5568]">Готов к переезду</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.isPublic}
+                    onChange={(e) => updateForm("isPublic", e.target.checked)}
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm text-[#4A5568]">Показывать профиль в базе рефереров</span>
+                </label>
+              </div>
             </div>
-            {form.resumeFileName && (
-              <p className="mt-2 text-xs text-[#718096]">
-                Файл: {form.resumeFileName}
-                {form.resumeFileMime ? ` · ${form.resumeFileMime}` : ""}
-                {form.resumeFileSize ? ` · ${humanFileSize(form.resumeFileSize)}` : ""}
-              </p>
-            )}
-            {uploadError && <p className="mt-1 text-xs text-red-500">{uploadError}</p>}
-          </div>
+          </>
+        ) : (
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+            <h3 className="text-base font-bold text-[#171923] mb-2">Данные реферала</h3>
+            <p className="text-sm text-[#4A5568] mb-4">
+              Укажи компанию и контакты. Этого достаточно, чтобы активировать профиль реферала.
+            </p>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-[#4A5568] mb-1.5">2) Ссылка на резюме</label>
-            <input
-              type="url"
-              value={form.resumeUrl}
-              onChange={(e) => updateForm("resumeUrl", e.target.value)}
-              placeholder="https://..."
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
-            />
-          </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
+                Компания <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={referrerForm.company}
+                onChange={(e) => setReferrerForm((prev) => ({ ...prev, company: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] outline-none focus:border-[#1863e5] bg-white"
+              >
+                <option value="">Выбери компанию</option>
+                {COMPANIES_META.map((c) => (
+                  <option key={c.slug} value={c.name}>{c.name}</option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[#4A5568] mb-1.5">3) Текст резюме</label>
-            <textarea
-              value={form.resumeText}
-              onChange={(e) => updateForm("resumeText", e.target.value)}
-              rows={8}
-              placeholder="Вставь текст резюме"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5] resize-none"
-            />
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-          <h3 className="text-base font-bold text-[#171923] mb-4">Дополнительные данные</h3>
-
-          <div className="grid md:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-[#4A5568] mb-1.5">LinkedIn</label>
               <input
                 type="url"
-                value={form.linkedinUrl}
-                onChange={(e) => updateForm("linkedinUrl", e.target.value)}
+                value={referrerForm.linkedinUrl}
+                onChange={(e) => setReferrerForm((prev) => ({ ...prev, linkedinUrl: e.target.value }))}
                 placeholder="https://linkedin.com/in/..."
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-[#4A5568] mb-1.5">GitHub</label>
-              <input
-                type="url"
-                value={form.githubUrl}
-                onChange={(e) => updateForm("githubUrl", e.target.value)}
-                placeholder="https://github.com/..."
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Личный сайт</label>
-              <input
-                type="url"
-                value={form.siteUrl}
-                onChange={(e) => updateForm("siteUrl", e.target.value)}
-                placeholder="https://..."
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
-              />
-            </div>
-          </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
-              О себе <span className="text-[#A0AEC0]">({form.bio.length}/700)</span>
-            </label>
-            <textarea
-              value={form.bio}
-              onChange={(e) => updateForm("bio", e.target.value.slice(0, 700))}
-              rows={4}
-              placeholder="Коротко о себе"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5] resize-none"
-            />
+            {referrer && (
+              <p className="mt-3 text-xs text-[#718096]">
+                Текущий профиль реферала: {referrer.company}
+              </p>
+            )}
           </div>
-
-          <div className="flex flex-col gap-3">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.openToRelocation}
-                onChange={(e) => updateForm("openToRelocation", e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span className="text-sm text-[#4A5568]">Готов к переезду</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.isPublic}
-                onChange={(e) => updateForm("isPublic", e.target.checked)}
-                className="w-4 h-4"
-              />
-              <span className="text-sm text-[#4A5568]">Показывать профиль в базе рефереров</span>
-            </label>
-          </div>
-        </div>
+        )}
 
         <div>
           <button
@@ -681,7 +822,9 @@ export default function ProfilePage() {
             disabled={submitting}
             className="w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors disabled:opacity-60"
           >
-            {submitting ? "Отправляю заявку..." : "Подать заявку"}
+            {submitting
+              ? userKind === "candidate" ? "Отправляю заявку..." : "Сохраняю профиль..."
+              : userKind === "candidate" ? "Подать заявку" : "Сохранить профиль реферала"}
           </button>
         </div>
       </div>

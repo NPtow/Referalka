@@ -26,7 +26,7 @@ export default function ForWhom() {
             >
               Кандидаты
             </h3>
-            <p className="text-[#718096] text-sm leading-relaxed mb-5">
+            <p className="text-[#4A5568] text-sm leading-relaxed mb-5">
               IT-специалисты, которые хотят попасть в Яндекс, Тинькофф, Озон, Авито и другие топовые компании РФ. Реферал — твой шорткат к рекрутеру.
             </p>
             <ul className="space-y-3 text-sm text-[#4A5568]">
@@ -77,7 +77,7 @@ export default function ForWhom() {
             >
               Рефереры
             </h3>
-            <p className="text-[#718096] text-sm leading-relaxed mb-5">
+            <p className="text-[#4A5568] text-sm leading-relaxed mb-5">
               Сотрудники компаний, которые хотят помочь крутым ребятам попасть в команду и заработать реферальный бонус от работодателя.
             </p>
             <ul className="space-y-3 text-sm text-[#4A5568]">

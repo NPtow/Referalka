@@ -24,7 +24,7 @@ export default function FAQ() {
                 <span className={`text-[#1863e5] transition-transform flex-shrink-0 ${open === i ? "rotate-45" : ""}`}>+</span>
               </button>
               {open === i && (
-                <div className="px-6 pb-5 text-sm text-[#718096] leading-relaxed border-t border-gray-50 pt-3">
+                <div className="px-6 pb-5 text-sm text-[#4A5568] leading-relaxed border-t border-gray-50 pt-3">
                   {faq.a}
                 </div>
               )}
