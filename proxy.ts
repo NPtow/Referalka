@@ -1,10 +1,25 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-const isProtectedRoute = createRouteMatcher(["/profile(.*)", "/requests(.*)", "/dashboard(.*)"]);
+const isProtectedRoute = createRouteMatcher(["/profile(.*)"]);
+
+function isLegacyUserRoute(pathname: string): boolean {
+  return (
+    pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard/") ||
+    pathname === "/companies" ||
+    pathname.startsWith("/companies/") ||
+    pathname === "/requests" ||
+    pathname.startsWith("/requests/")
+  );
+}
 
 export default clerkMiddleware(async (auth, req) => {
   const { pathname } = req.nextUrl;
+
+  if (isLegacyUserRoute(pathname)) {
+    return NextResponse.redirect(new URL("/profile", req.url));
+  }
 
   if (pathname.startsWith("/marketplace") && process.env.NEXT_PUBLIC_SHOW_MARKETPLACE !== "true") {
     return NextResponse.redirect(new URL("/", req.url));

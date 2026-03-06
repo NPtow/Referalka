@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter_Tight, DM_Sans } from "next/font/google";
-import { ClerkProvider, Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import ClerkSessionBridge from "@/components/ClerkSessionBridge";
@@ -28,15 +28,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${interTight.variable} ${dmSans.variable} antialiased`} style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}>
         <ClerkProvider>
           <ClerkSessionBridge />
-          <header className="fixed top-3 right-4 z-[60] flex items-center gap-2 rounded-xl border border-gray-200 bg-white/95 px-3 py-2 shadow-sm">
-            <Show when="signed-out">
-              <SignInButton />
-              <SignUpButton />
-            </Show>
-            <Show when="signed-in">
-              <UserButton />
-            </Show>
-          </header>
           <Navbar />
           {children}
         </ClerkProvider>

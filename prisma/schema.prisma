@@ -23,9 +23,14 @@ model Profile {
   id          String   @id @default(cuid())
   userId      Int      @unique
   companies   String[]
+  roles       String[] @default([])
   role        String
   experience  Int
   resumeUrl   String?
+  resumeFileUrl   String?
+  resumeFileName  String?
+  resumeFileMime  String?
+  resumeFileSize  Int?
   linkedinUrl String?
   githubUrl   String?
   siteUrl     String?
@@ -36,6 +41,7 @@ model Profile {
   openToRelocation Boolean  @default(false)
   location         String?
   resumeText       String?
+  applicationSubmittedAt DateTime?
   summary          String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt

@@ -27,7 +27,7 @@ export default function ReferrerPage() {
     });
     setSaving(false);
     setDone(true);
-    setTimeout(() => router.push("/dashboard"), 1500);
+    setTimeout(() => router.push("/profile"), 1500);
   };
 
   return (
@@ -69,7 +69,7 @@ export default function ReferrerPage() {
             <div className="text-center py-6">
               <div className="text-4xl mb-3">🎉</div>
               <p className="font-bold text-[#171923] text-lg">Готово, {displayName}!</p>
-              <p className="text-sm text-[#718096] mt-1">Переходим в маркетплейс...</p>
+              <p className="text-sm text-[#718096] mt-1">Переходим в профиль...</p>
             </div>
           ) : (
             <div>
@@ -114,7 +114,7 @@ export default function ReferrerPage() {
                 disabled={!company || saving}
                 className="w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors disabled:opacity-50"
               >
-                {saving ? "Сохраняю..." : "Перейти в маркетплейс →"}
+                {saving ? "Сохраняю..." : "Сохранить и перейти в профиль →"}
               </button>
             </div>
           )}
@@ -122,7 +122,7 @@ export default function ReferrerPage() {
 
         <p className="text-center text-xs text-[#A0AEC0] mt-4">
           Ищешь реферал сам?{" "}
-          <Link href="/companies" className="text-[#1863e5] hover:underline">Перейти к компаниям</Link>
+          <Link href="/profile" className="text-[#1863e5] hover:underline">Перейти в профиль</Link>
         </p>
       </div>
     </div>

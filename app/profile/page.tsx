@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { SignInButton, SignUpButton, useClerk, useUser } from "@clerk/nextjs";
 import { COMPANIES_META, ROLES } from "@/lib/constants";
@@ -9,9 +8,14 @@ import { COMPANIES_META, ROLES } from "@/lib/constants";
 interface ProfileData {
   id: string;
   role: string;
+  roles: string[];
   experience: number;
   companies: string[];
   resumeUrl: string | null;
+  resumeFileUrl: string | null;
+  resumeFileName: string | null;
+  resumeFileMime: string | null;
+  resumeFileSize: number | null;
   linkedinUrl: string | null;
   githubUrl: string | null;
   siteUrl: string | null;
@@ -20,6 +24,7 @@ interface ProfileData {
   openToRelocation: boolean;
   location: string | null;
   resumeText: string | null;
+  applicationSubmittedAt: string | null;
   _count?: { views: number };
   user: {
     firstName: string;
@@ -28,70 +33,119 @@ interface ProfileData {
   };
 }
 
+type FormState = {
+  roles: string[];
+  companies: string[];
+  experience: number;
+  location: string;
+  resumeUrl: string;
+  resumeFileUrl: string | null;
+  resumeFileName: string | null;
+  resumeFileMime: string | null;
+  resumeFileSize: number | null;
+  resumeText: string;
+  linkedinUrl: string;
+  githubUrl: string;
+  siteUrl: string;
+  bio: string;
+  openToRelocation: boolean;
+  isPublic: boolean;
+};
+
+function formatDate(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("ru-RU", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function humanFileSize(value: number | null): string {
+  if (!value || value <= 0) return "";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function ProfilePage() {
   const { isLoaded, isSignedIn, user } = useUser();
   const { signOut } = useClerk();
 
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [form, setForm] = useState<FormState>({
+    roles: [],
+    companies: [],
+    experience: 2,
+    location: "",
+    resumeUrl: "",
+    resumeFileUrl: null,
+    resumeFileName: null,
+    resumeFileMime: null,
+    resumeFileSize: null,
+    resumeText: "",
+    linkedinUrl: "",
+    githubUrl: "",
+    siteUrl: "",
+    bio: "",
+    openToRelocation: false,
+    isPublic: false,
+  });
+  const [customRole, setCustomRole] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const [role, setRole] = useState(ROLES[0] ?? "");
-  const [experience, setExperience] = useState(2);
-  const [companies, setCompanies] = useState<string[]>([]);
-  const [resumeUrl, setResumeUrl] = useState("");
-  const [linkedinUrl, setLinkedinUrl] = useState("");
-  const [githubUrl, setGithubUrl] = useState("");
-  const [siteUrl, setSiteUrl] = useState("");
-
-  const [bio, setBio] = useState("");
-  const [location, setLocation] = useState("");
-  const [openToRelocation, setOpenToRelocation] = useState(false);
-  const [isPublic, setIsPublic] = useState(false);
-  const [resumeText, setResumeText] = useState("");
-  const [resumeFileName, setResumeFileName] = useState("");
-  const [parsing, setParsing] = useState(false);
-  const [parseError, setParseError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isLoaded) return;
+
     if (!isSignedIn) {
       setLoading(false);
       return;
     }
 
     fetch("/api/profile")
-      .then(async (r) => {
-        if (r.status === 404) {
-          setLoading(false);
-          return null;
-        }
-        const data = await r.json();
-        if (!r.ok) throw new Error(data?.error ?? "Ошибка загрузки");
-        return data.profile as ProfileData;
+      .then(async (res) => {
+        if (res.status === 404) return null;
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Ошибка загрузки профиля");
+        return json.profile as ProfileData;
       })
-      .then((loadedProfile) => {
-        if (!loadedProfile) return;
+      .then((loaded) => {
+        if (!loaded) return;
 
-        setProfile(loadedProfile);
-        setRole(loadedProfile.role);
-        setExperience(loadedProfile.experience);
-        setCompanies(loadedProfile.companies ?? []);
-        setResumeUrl(loadedProfile.resumeUrl ?? "");
-        setLinkedinUrl(loadedProfile.linkedinUrl ?? "");
-        setGithubUrl(loadedProfile.githubUrl ?? "");
-        setSiteUrl(loadedProfile.siteUrl ?? "");
-        setBio(loadedProfile.bio ?? "");
-        setLocation(loadedProfile.location ?? "");
-        setOpenToRelocation(loadedProfile.openToRelocation ?? false);
-        setIsPublic(loadedProfile.isPublic ?? false);
-        setResumeText(loadedProfile.resumeText ?? "");
-        if (loadedProfile.resumeText) setResumeFileName("резюме.pdf");
+        setProfile(loaded);
+        setForm({
+          roles: loaded.roles?.length ? loaded.roles : [loaded.role],
+          companies: loaded.companies ?? [],
+          experience: loaded.experience ?? 0,
+          location: loaded.location ?? "",
+          resumeUrl: loaded.resumeUrl ?? "",
+          resumeFileUrl: loaded.resumeFileUrl,
+          resumeFileName: loaded.resumeFileName,
+          resumeFileMime: loaded.resumeFileMime,
+          resumeFileSize: loaded.resumeFileSize,
+          resumeText: loaded.resumeText ?? "",
+          linkedinUrl: loaded.linkedinUrl ?? "",
+          githubUrl: loaded.githubUrl ?? "",
+          siteUrl: loaded.siteUrl ?? "",
+          bio: loaded.bio ?? "",
+          openToRelocation: loaded.openToRelocation ?? false,
+          isPublic: loaded.isPublic ?? false,
+        });
+        if (loaded.applicationSubmittedAt) {
+          setSubmitSuccess(`Последняя заявка отправлена: ${formatDate(loaded.applicationSubmittedAt)}`);
+        }
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Ошибка загрузки профиля");
@@ -111,102 +165,150 @@ export default function ProfilePage() {
   const displayUsername = profile?.user.username || user?.username || user?.primaryEmailAddress?.emailAddress || null;
   const displayPhoto = profile?.user.photoUrl || user?.imageUrl || null;
 
-  const toggleCompany = (company: string) => {
-    setCompanies((prev) =>
-      prev.includes(company) ? prev.filter((c) => c !== company) : [...prev, company]
-    );
+  const hasAnyResume = Boolean(form.resumeFileUrl || form.resumeUrl.trim() || form.resumeText.trim());
+
+  const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const toggleRole = (role: string) => {
+    setForm((prev) => {
+      if (prev.roles.includes(role)) {
+        return { ...prev, roles: prev.roles.filter((r) => r !== role) };
+      }
+      return { ...prev, roles: [...prev.roles, role] };
+    });
+  };
+
+  const addCustomRole = () => {
+    const trimmed = customRole.trim();
+    if (!trimmed) return;
+    setForm((prev) => {
+      if (prev.roles.some((r) => r.toLowerCase() === trimmed.toLowerCase())) return prev;
+      return { ...prev, roles: [...prev.roles, trimmed] };
+    });
+    setCustomRole("");
+  };
+
+  const removeRole = (role: string) => {
+    setForm((prev) => ({ ...prev, roles: prev.roles.filter((r) => r !== role) }));
+  };
+
+  const toggleCompany = (company: string) => {
+    setForm((prev) => {
+      if (prev.companies.includes(company)) {
+        return { ...prev, companies: prev.companies.filter((c) => c !== company) };
+      }
+      return { ...prev, companies: [...prev.companies, company] };
+    });
+  };
+
+  const collectPayload = () => ({
+    roles: form.roles,
+    companies: form.companies,
+    experience: form.experience,
+    location: form.location || null,
+    resumeUrl: form.resumeUrl || null,
+    resumeFileUrl: form.resumeFileUrl,
+    resumeFileName: form.resumeFileName,
+    resumeFileMime: form.resumeFileMime,
+    resumeFileSize: form.resumeFileSize,
+    resumeText: form.resumeText || null,
+    linkedinUrl: form.linkedinUrl || null,
+    githubUrl: form.githubUrl || null,
+    siteUrl: form.siteUrl || null,
+    bio: form.bio || null,
+    openToRelocation: form.openToRelocation,
+    isPublic: form.isPublic,
+  });
+
+  const validateForm = (): string | null => {
+    if (!form.roles.length) return "Выбери хотя бы одну роль.";
+    if (!form.companies.length) return "Выбери хотя бы одну компанию.";
+    if (!Number.isFinite(form.experience) || form.experience < 0) return "Укажи корректный опыт.";
+    if (!hasAnyResume) return "Добавь резюме файлом, ссылкой или текстом.";
+    return null;
+  };
+
+  const handleUploadResume = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setParsing(true);
-    setParseError("");
-
-    const form = new FormData();
-    form.append("file", file);
+    setUploadError(null);
+    setUploading(true);
 
     try {
-      const res = await fetch("/api/profile/parse-resume", { method: "POST", body: form });
+      const body = new FormData();
+      body.append("file", file);
+
+      const res = await fetch("/api/profile/resume/upload", {
+        method: "POST",
+        body,
+      });
       const json = await res.json();
-      if (!res.ok || !json.text) {
-        setParseError(json.error ?? "Не удалось обработать файл");
-      } else {
-        setResumeText(json.text);
-        setResumeFileName(file.name);
+
+      if (!res.ok) {
+        setUploadError(json.error ?? "Не удалось загрузить резюме");
+        return;
       }
+
+      setForm((prev) => ({
+        ...prev,
+        resumeFileUrl: json.resumeFileUrl ?? null,
+        resumeFileName: json.resumeFileName ?? file.name,
+        resumeFileMime: json.resumeFileMime ?? file.type ?? null,
+        resumeFileSize: json.resumeFileSize ?? file.size,
+        resumeText: json.resumeText || prev.resumeText,
+      }));
     } catch {
-      setParseError("Ошибка соединения");
+      setUploadError("Ошибка сети при загрузке резюме");
     } finally {
-      setParsing(false);
+      setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleSave = async () => {
+  const handleSubmitApplication = async () => {
     setError(null);
+    setSubmitSuccess(null);
 
-    if (!role.trim()) {
-      setError("Укажи роль.");
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
-    if (!companies.length) {
-      setError("Выбери хотя бы одну компанию.");
-      return;
-    }
-
-    if (!Number.isFinite(experience) || experience < 0) {
-      setError("Укажи корректный опыт.");
-      return;
-    }
-
-    setSaving(true);
+    setSubmitting(true);
 
     try {
-      const res = await fetch("/api/profile", {
+      const res = await fetch("/api/profile/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role,
-          experience,
-          companies,
-          resumeUrl: resumeUrl || null,
-          linkedinUrl: linkedinUrl || null,
-          githubUrl: githubUrl || null,
-          siteUrl: siteUrl || null,
-          bio: bio || null,
-          location: location || null,
-          openToRelocation,
-          isPublic,
-          resumeText: resumeText || null,
-        }),
+        body: JSON.stringify(collectPayload()),
       });
+      const json = await res.json();
 
-      const data = await res.json();
-      if (!res.ok || !data.profile) {
-        setError(data.error ?? "Не удалось сохранить профиль");
+      if (!res.ok || !json.ok) {
+        setError(json.error ?? "Не удалось отправить заявку.");
         return;
       }
 
-      setProfile(data.profile as ProfileData);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      if (json.profile) setProfile(json.profile as ProfileData);
+      setSubmitSuccess(`Заявка отправлена: ${formatDate(json.submittedAt ?? new Date().toISOString())}`);
     } catch {
-      setError("Ошибка сети. Попробуй еще раз.");
+      setError("Ошибка сети при отправке заявки.");
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
-  };
-
-  const handleLogout = async () => {
-    await signOut({ redirectUrl: "/" });
   };
 
   const handleDeleteAccount = async () => {
     setDeleting(true);
     await fetch("/api/profile", { method: "DELETE" });
+    await signOut({ redirectUrl: "/" });
+  };
+
+  const handleLogout = async () => {
     await signOut({ redirectUrl: "/" });
   };
 
@@ -227,7 +329,7 @@ export default function ProfilePage() {
             <h1 className="text-2xl font-black text-[#171923] mb-3" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
               Мой профиль
             </h1>
-            <p className="text-[#718096] mb-6">Войдите через Clerk, чтобы заполнить профиль</p>
+            <p className="text-[#718096] mb-6">Войдите через Clerk, чтобы заполнить профиль и подать заявку</p>
             <div className="flex items-center justify-center gap-3">
               <SignInButton mode="modal">
                 <button className="bg-[#1863e5] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#1550c0] transition-colors">
@@ -251,10 +353,14 @@ export default function ProfilePage() {
       <div className="h-16" />
 
       <div className="max-w-3xl mx-auto px-4 py-12">
-        <div className="text-sm text-[#A0AEC0] mb-6">
-          <Link href="/dashboard" className="hover:text-[#1863e5] transition-colors">Главная</Link>
-          <span className="mx-2">/</span>
-          <span className="text-[#718096]">Мой профиль</span>
+        <div className="bg-[#EBF4FF] border border-[#C3DAFE] rounded-2xl p-5 mb-6">
+          <h1 className="text-lg font-black text-[#171923] mb-1" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
+            Заполни профиль, чтобы подать заявку на реферал
+          </h1>
+          <p className="text-sm text-[#4A5568]">
+            После нажатия кнопки внизу мы сохраним профиль и отправим заявку владельцу сервиса.
+          </p>
+          {submitSuccess && <p className="text-sm text-green-700 mt-2">{submitSuccess}</p>}
         </div>
 
         {error && (
@@ -279,9 +385,9 @@ export default function ProfilePage() {
               </div>
             )}
             <div className="flex-1">
-              <h1 className="text-xl font-black text-[#171923]" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
+              <h2 className="text-xl font-black text-[#171923]" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
                 {displayName}
-              </h1>
+              </h2>
               {displayUsername && <p className="text-sm text-[#A0AEC0]">{displayUsername}</p>}
             </div>
             {(profile?._count?.views ?? 0) > 0 && (
@@ -330,41 +436,85 @@ export default function ProfilePage() {
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-          <h2 className="text-base font-bold text-[#171923] mb-1">Основные данные</h2>
-          <p className="text-xs text-[#A0AEC0] mb-5">Заполни профиль здесь, без отдельного онбординга</p>
+          <h3 className="text-base font-bold text-[#171923] mb-4">Обязательные поля</h3>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-[#4A5568] mb-2">Роли (можно несколько)</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {ROLES.map((role) => {
+                const active = form.roles.includes(role);
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => toggleRole(role)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                      active ? "bg-[#1863e5] text-white" : "bg-[#F7FAFC] text-[#4A5568] hover:bg-[#EBF4FF]"
+                    }`}
+                  >
+                    {role}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customRole}
+                onChange={(e) => setCustomRole(e.target.value)}
+                placeholder="Своя роль"
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+              />
+              <button
+                type="button"
+                onClick={addCustomRole}
+                className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-[#171923] hover:bg-gray-50 transition-colors"
+              >
+                Добавить
+              </button>
+            </div>
+            {form.roles.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {form.roles.map((role) => (
+                  <span key={role} className="inline-flex items-center gap-2 rounded-full bg-[#EBF4FF] px-3 py-1 text-xs font-medium text-[#1863e5]">
+                    {role}
+                    <button type="button" onClick={() => removeRole(role)} className="text-[#1550c0] hover:text-[#0f3d92]">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="grid md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Роль</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] outline-none focus:border-[#1863e5] bg-white"
-              >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </select>
-            </div>
             <div>
               <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Опыт (лет)</label>
               <input
                 type="number"
                 min={0}
-                max={40}
-                value={experience}
-                onChange={(e) => setExperience(Number(e.target.value) || 0)}
+                max={50}
+                value={form.experience}
+                onChange={(e) => updateForm("experience", Number(e.target.value) || 0)}
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] outline-none focus:border-[#1863e5]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Локация</label>
+              <input
+                type="text"
+                value={form.location}
+                onChange={(e) => updateForm("location", e.target.value)}
+                placeholder="Москва"
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
               />
             </div>
           </div>
 
-          <div className="mb-5">
-            <label className="block text-sm font-medium text-[#4A5568] mb-2">Компании, куда хочешь попасть</label>
+          <div>
+            <label className="block text-sm font-medium text-[#4A5568] mb-2">Компании (можно несколько)</label>
             <div className="max-h-44 overflow-y-auto rounded-xl border border-gray-200 p-3">
               <div className="flex flex-wrap gap-2">
                 {COMPANIES_META.map((c) => {
-                  const active = companies.includes(c.name);
+                  const active = form.companies.includes(c.name);
                   return (
                     <button
                       key={c.slug}
@@ -381,24 +531,84 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Ссылка на резюме</label>
-              <input
-                type="url"
-                value={resumeUrl}
-                onChange={(e) => setResumeUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
-              />
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+          <h3 className="text-base font-bold text-[#171923] mb-2">Резюме</h3>
+          <p className="text-xs text-[#A0AEC0] mb-4">Нужен хотя бы один способ: файл, ссылка или текст.</p>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-[#4A5568] mb-1.5">1) Загрузить файл (PDF/DOCX)</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={handleUploadResume}
+              className="hidden"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-[#171923] hover:bg-gray-50 transition-colors disabled:opacity-60"
+              >
+                {uploading ? "Загрузка..." : "Выбрать файл"}
+              </button>
+              {form.resumeFileUrl && (
+                <a
+                  href={form.resumeFileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-[#1863e5] hover:underline"
+                >
+                  Открыть файл
+                </a>
+              )}
             </div>
+            {form.resumeFileName && (
+              <p className="mt-2 text-xs text-[#718096]">
+                Файл: {form.resumeFileName}
+                {form.resumeFileMime ? ` · ${form.resumeFileMime}` : ""}
+                {form.resumeFileSize ? ` · ${humanFileSize(form.resumeFileSize)}` : ""}
+              </p>
+            )}
+            {uploadError && <p className="mt-1 text-xs text-red-500">{uploadError}</p>}
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-[#4A5568] mb-1.5">2) Ссылка на резюме</label>
+            <input
+              type="url"
+              value={form.resumeUrl}
+              onChange={(e) => updateForm("resumeUrl", e.target.value)}
+              placeholder="https://..."
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#4A5568] mb-1.5">3) Текст резюме</label>
+            <textarea
+              value={form.resumeText}
+              onChange={(e) => updateForm("resumeText", e.target.value)}
+              rows={8}
+              placeholder="Вставь текст резюме"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5] resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
+          <h3 className="text-base font-bold text-[#171923] mb-4">Дополнительные данные</h3>
+
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-[#4A5568] mb-1.5">LinkedIn</label>
               <input
                 type="url"
-                value={linkedinUrl}
-                onChange={(e) => setLinkedinUrl(e.target.value)}
+                value={form.linkedinUrl}
+                onChange={(e) => updateForm("linkedinUrl", e.target.value)}
                 placeholder="https://linkedin.com/in/..."
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
               />
@@ -407,127 +617,69 @@ export default function ProfilePage() {
               <label className="block text-sm font-medium text-[#4A5568] mb-1.5">GitHub</label>
               <input
                 type="url"
-                value={githubUrl}
-                onChange={(e) => setGithubUrl(e.target.value)}
+                value={form.githubUrl}
+                onChange={(e) => updateForm("githubUrl", e.target.value)}
                 placeholder="https://github.com/..."
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
               />
             </div>
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Личный сайт</label>
               <input
                 type="url"
-                value={siteUrl}
-                onChange={(e) => setSiteUrl(e.target.value)}
+                value={form.siteUrl}
+                onChange={(e) => updateForm("siteUrl", e.target.value)}
                 placeholder="https://..."
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
               />
             </div>
           </div>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-          <h2 className="text-base font-bold text-[#171923] mb-1">Настройки маркетплейса</h2>
-          <p className="text-xs text-[#A0AEC0] mb-5">Эти данные будут видны рефереру при просмотре твоего профиля</p>
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
-              О себе
-              <span className="text-[#A0AEC0] font-normal ml-1">({bio.length}/500)</span>
+              О себе <span className="text-[#A0AEC0]">({form.bio.length}/700)</span>
             </label>
             <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value.slice(0, 500))}
+              value={form.bio}
+              onChange={(e) => updateForm("bio", e.target.value.slice(0, 700))}
               rows={4}
-              placeholder="Кратко опиши свой опыт и цели"
+              placeholder="Коротко о себе"
               className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5] resize-none"
             />
           </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Локация</label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Москва"
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
-            />
-          </div>
-
-          <div className="mb-5">
+          <div className="flex flex-col gap-3">
             <label className="flex items-center gap-3 cursor-pointer">
-              <div
-                onClick={() => setOpenToRelocation(!openToRelocation)}
-                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${openToRelocation ? "bg-[#1863e5]" : "bg-gray-200"}`}
-              >
-                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${openToRelocation ? "translate-x-5.5" : "translate-x-0.5"}`} />
-              </div>
+              <input
+                type="checkbox"
+                checked={form.openToRelocation}
+                onChange={(e) => updateForm("openToRelocation", e.target.checked)}
+                className="w-4 h-4"
+              />
               <span className="text-sm text-[#4A5568]">Готов к переезду</span>
             </label>
-          </div>
-
-          <div className="mb-5">
-            <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
-              Резюме файлом
-              <span className="text-[#A0AEC0] font-normal ml-1 text-xs"> — PDF или DOCX, мы извлечем текст для подбора вакансий</span>
-            </label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-            <div
-              onClick={() => !parsing && fileInputRef.current?.click()}
-              className={`w-full border-2 border-dashed rounded-xl px-4 py-6 text-center cursor-pointer transition-colors ${
-                resumeText ? "border-green-300 bg-green-50" : "border-gray-200 bg-white hover:border-[#1863e5] hover:bg-[#F7FAFC]"
-              } ${parsing ? "opacity-60 cursor-wait" : ""}`}
-            >
-              {parsing ? (
-                <p className="text-sm text-[#718096]">Обрабатываю файл...</p>
-              ) : resumeText ? (
-                <div>
-                  <p className="text-sm font-medium text-green-700">✓ {resumeFileName || "Резюме загружено"}</p>
-                  <p className="text-xs text-[#718096] mt-1">{resumeText.length.toLocaleString()} символов извлечено</p>
-                </div>
-              ) : (
-                <div>
-                  <p className="text-sm text-[#718096]">Нажми, чтобы загрузить PDF или DOCX</p>
-                  <p className="text-xs text-[#A0AEC0] mt-1">Мы используем текст для подбора вакансий</p>
-                </div>
-              )}
-            </div>
-            {parseError && <p className="text-xs text-red-500 mt-1.5">{parseError}</p>}
-          </div>
-
-          <div className="border-t border-gray-100 pt-5">
-            <label className="flex items-start gap-3 cursor-pointer" onClick={() => setIsPublic(!isPublic)}>
-              <div className={`mt-0.5 w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${isPublic ? "bg-[#1863e5]" : "bg-gray-200"}`}>
-                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isPublic ? "translate-x-5.5" : "translate-x-0.5"}`} />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-[#171923]">Показать в маркетплейсе</p>
-                <p className="text-xs text-[#A0AEC0] mt-0.5">Рефереры из компаний смогут найти тебя и написать напрямую</p>
-              </div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.isPublic}
+                onChange={(e) => updateForm("isPublic", e.target.checked)}
+                className="w-4 h-4"
+              />
+              <span className="text-sm text-[#4A5568]">Показывать профиль в базе рефереров</span>
             </label>
           </div>
         </div>
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors disabled:opacity-60"
-        >
-          {saving ? "Сохраняю..." : saved ? "Сохранено ✓" : "Сохранить"}
-        </button>
-
-        {isPublic && process.env.NEXT_PUBLIC_SHOW_MARKETPLACE === "true" && (
-          <p className="text-center text-xs text-[#718096] mt-3">
-            Твой профиль виден в <Link href="/marketplace" className="text-[#1863e5] hover:underline">маркетплейсе →</Link>
-          </p>
-        )}
+        <div>
+          <button
+            type="button"
+            onClick={handleSubmitApplication}
+            disabled={submitting}
+            className="w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors disabled:opacity-60"
+          >
+            {submitting ? "Отправляю заявку..." : "Подать заявку"}
+          </button>
+        </div>
       </div>
     </div>
   );

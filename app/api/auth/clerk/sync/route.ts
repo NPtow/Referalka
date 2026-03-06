@@ -8,9 +8,7 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    return NextResponse.json({
-      redirect: user.profile ? "/dashboard" : "/profile",
-    });
+    return NextResponse.json({ redirect: "/profile" });
   } catch (err) {
     console.error("[Clerk Sync] Error:", err);
     return NextResponse.json({ error: "Unable to sync user" }, { status: 500 });
