@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const REVIEWS = [
   {
     name: "Артем, Backend Engineer",
@@ -65,6 +67,16 @@ export default function Testimonials() {
             <p className="text-sm leading-relaxed text-[#4A5568]">{review.text}</p>
           </article>
         ))}
+      </div>
+
+      <div className="max-w-5xl mx-auto mt-10 text-center">
+        <p className="text-sm text-[#4A5568] mb-4">Хочешь такой же результат? Начни прямо сейчас.</p>
+        <Link
+          href="/sign-up"
+          className="inline-flex items-center justify-center rounded-xl bg-[#1863e5] px-6 py-3 text-sm font-semibold text-white hover:bg-[#1550c0] transition-colors"
+        >
+          Зарегистрироваться
+        </Link>
       </div>
     </section>
   );
