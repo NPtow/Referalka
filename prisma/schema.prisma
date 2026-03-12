@@ -87,6 +87,7 @@ model Profile {
   resumeFileName  String?
   resumeFileMime  String?
   resumeFileSize  Int?
+  telegramContact String?
   linkedinUrl String?
   githubUrl   String?
   siteUrl     String?
@@ -118,6 +119,7 @@ model Referrer {
   id          String   @id @default(cuid())
   userId      Int      @unique
   company     String
+  telegramContact String?
   linkedinUrl String?
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id])

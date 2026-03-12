@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { COMPANIES_META, ROLES } from "@/lib/constants";
 import { authClient } from "@/lib/auth-client";
+import CompanyPicker from "@/components/ui/CompanyPicker";
+import Toast from "@/components/ui/Toast";
 
 interface ProfileData {
   id: string;
@@ -17,6 +19,7 @@ interface ProfileData {
   resumeFileName: string | null;
   resumeFileMime: string | null;
   resumeFileSize: number | null;
+  telegramContact: string | null;
   linkedinUrl: string | null;
   githubUrl: string | null;
   siteUrl: string | null;
@@ -37,6 +40,7 @@ interface ProfileData {
 interface ReferrerData {
   id: string;
   company: string;
+  telegramContact: string | null;
   linkedinUrl: string | null;
 }
 
@@ -53,6 +57,7 @@ type FormState = {
   resumeFileMime: string | null;
   resumeFileSize: number | null;
   resumeText: string;
+  telegramContact: string;
   linkedinUrl: string;
   githubUrl: string;
   siteUrl: string;
@@ -61,11 +66,19 @@ type FormState = {
   isPublic: boolean;
 };
 
+type ReferrerFormState = {
+  company: string;
+  telegramContact: string;
+  linkedinUrl: string;
+};
+
 type SessionUser = {
   name: string;
   email: string;
   image: string | null;
 };
+
+const COMPANY_OPTIONS = COMPANIES_META.map((company) => company.name);
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -87,6 +100,35 @@ function humanFileSize(value: number | null): string {
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function FieldLabel({
+  children,
+  required = false,
+  optional = false,
+  extra,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+  optional?: boolean;
+  extra?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-1.5 flex flex-wrap items-center gap-2 text-sm font-medium text-[#4A5568]">
+      <span>{children}</span>
+      {required && (
+        <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-600">
+          * Обязательно
+        </span>
+      )}
+      {optional && (
+        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-[#718096]">
+          Опционально
+        </span>
+      )}
+      {extra}
+    </div>
+  );
+}
+
 export default function ProfileClient({ sessionUser }: { sessionUser: SessionUser }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -104,6 +146,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
     resumeFileMime: null,
     resumeFileSize: null,
     resumeText: "",
+    telegramContact: "",
     linkedinUrl: "",
     githubUrl: "",
     siteUrl: "",
@@ -111,13 +154,15 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
     openToRelocation: false,
     isPublic: false,
   });
-  const [referrerForm, setReferrerForm] = useState({
+  const [referrerForm, setReferrerForm] = useState<ReferrerFormState>({
     company: "",
+    telegramContact: "",
     linkedinUrl: "",
   });
   const [customRole, setCustomRole] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [lastSubmittedStatus, setLastSubmittedStatus] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -126,10 +171,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    Promise.all([
-      fetch("/api/profile"),
-      fetch("/api/referrer"),
-    ])
+    Promise.all([fetch("/api/profile"), fetch("/api/referrer")])
       .then(async ([profileRes, referrerRes]) => {
         let loadedProfile: ProfileData | null = null;
         if (profileRes.status !== 404) {
@@ -155,6 +197,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
             resumeFileMime: loadedProfile.resumeFileMime,
             resumeFileSize: loadedProfile.resumeFileSize,
             resumeText: loadedProfile.resumeText ?? "",
+            telegramContact: loadedProfile.telegramContact ?? "",
             linkedinUrl: loadedProfile.linkedinUrl ?? "",
             githubUrl: loadedProfile.githubUrl ?? "",
             siteUrl: loadedProfile.siteUrl ?? "",
@@ -163,7 +206,9 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
             isPublic: loadedProfile.isPublic ?? false,
           });
           if (loadedProfile.applicationSubmittedAt) {
-            setSubmitSuccess(`Последняя заявка отправлена: ${formatDate(loadedProfile.applicationSubmittedAt)}`);
+            setLastSubmittedStatus(
+              `Последняя заявка отправлена: ${formatDate(loadedProfile.applicationSubmittedAt)}`,
+            );
           }
         }
 
@@ -171,6 +216,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
           setReferrer(loadedReferrer);
           setReferrerForm({
             company: loadedReferrer.company ?? "",
+            telegramContact: loadedReferrer.telegramContact ?? "",
             linkedinUrl: loadedReferrer.linkedinUrl ?? "",
           });
           setUserKind("referrer");
@@ -195,7 +241,6 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
 
   const displayUsername = profile?.user.username || sessionUser.email || null;
   const displayPhoto = profile?.user.photoUrl || sessionUser.image || null;
-
   const hasAnyResume = Boolean(form.resumeFileUrl || form.resumeUrl.trim() || form.resumeText.trim());
 
   const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -205,7 +250,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
   const toggleRole = (role: string) => {
     setForm((prev) => {
       if (prev.roles.includes(role)) {
-        return { ...prev, roles: prev.roles.filter((r) => r !== role) };
+        return { ...prev, roles: prev.roles.filter((item) => item !== role) };
       }
       return { ...prev, roles: [...prev.roles, role] };
     });
@@ -214,24 +259,16 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
   const addCustomRole = () => {
     const trimmed = customRole.trim();
     if (!trimmed) return;
+
     setForm((prev) => {
-      if (prev.roles.some((r) => r.toLowerCase() === trimmed.toLowerCase())) return prev;
+      if (prev.roles.some((role) => role.toLowerCase() === trimmed.toLowerCase())) return prev;
       return { ...prev, roles: [...prev.roles, trimmed] };
     });
     setCustomRole("");
   };
 
   const removeRole = (role: string) => {
-    setForm((prev) => ({ ...prev, roles: prev.roles.filter((r) => r !== role) }));
-  };
-
-  const toggleCompany = (company: string) => {
-    setForm((prev) => {
-      if (prev.companies.includes(company)) {
-        return { ...prev, companies: prev.companies.filter((c) => c !== company) };
-      }
-      return { ...prev, companies: [...prev.companies, company] };
-    });
+    setForm((prev) => ({ ...prev, roles: prev.roles.filter((item) => item !== role) }));
   };
 
   const collectPayload = () => ({
@@ -245,6 +282,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
     resumeFileMime: form.resumeFileMime,
     resumeFileSize: form.resumeFileSize,
     resumeText: form.resumeText || null,
+    telegramContact: form.telegramContact || null,
     linkedinUrl: form.linkedinUrl || null,
     githubUrl: form.githubUrl || null,
     siteUrl: form.siteUrl || null,
@@ -258,6 +296,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
       if (!referrerForm.company.trim()) return "Укажи компанию, в которой ты можешь реферить.";
       return null;
     }
+
     if (!form.roles.length) return "Выбери хотя бы одну роль.";
     if (!form.companies.length) return "Выбери хотя бы одну компанию.";
     if (!Number.isFinite(form.experience) || form.experience < 0) return "Укажи корректный опыт.";
@@ -265,8 +304,8 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
     return null;
   };
 
-  const handleUploadResume = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleUploadResume = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     setUploadError(null);
@@ -276,13 +315,13 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
       const body = new FormData();
       body.append("file", file);
 
-      const res = await fetch("/api/profile/resume/upload", {
+      const response = await fetch("/api/profile/resume/upload", {
         method: "POST",
         body,
       });
-      const json = await res.json();
+      const json = await response.json();
 
-      if (!res.ok) {
+      if (!response.ok) {
         setUploadError(json.error ?? "Не удалось загрузить резюме");
         return;
       }
@@ -305,7 +344,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
 
   const handleSubmitApplication = async () => {
     setError(null);
-    setSubmitSuccess(null);
+    setToastMessage(null);
 
     const validationError = validateForm();
     if (validationError) {
@@ -317,33 +356,41 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
 
     try {
       if (userKind === "referrer") {
-        const res = await fetch("/api/referrer", {
+        const response = await fetch("/api/referrer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             company: referrerForm.company,
+            telegramContact: referrerForm.telegramContact || null,
             linkedinUrl: referrerForm.linkedinUrl || null,
           }),
         });
-        const json = await res.json();
-        if (!res.ok || !json.referrer) {
+        const json = await response.json();
+
+        if (!response.ok || !json.referrer) {
           setError(json.error ?? "Не удалось сохранить профиль реферала.");
           return;
         }
 
-        setReferrer(json.referrer as ReferrerData);
-        setSubmitSuccess("Профиль реферала сохранен.");
+        const savedReferrer = json.referrer as ReferrerData;
+        setReferrer(savedReferrer);
+        setReferrerForm({
+          company: savedReferrer.company ?? "",
+          telegramContact: savedReferrer.telegramContact ?? "",
+          linkedinUrl: savedReferrer.linkedinUrl ?? "",
+        });
+        setToastMessage("Профиль реферала сохранен");
         return;
       }
 
-      const res = await fetch("/api/profile/submit", {
+      const response = await fetch("/api/profile/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(collectPayload()),
       });
-      const json = await res.json();
+      const json = await response.json();
 
-      if (!res.ok || !json.ok) {
+      if (!response.ok || !json.ok) {
         const details =
           typeof json.details === "string" && json.details.trim().length
             ? ` Детали: ${json.details}`
@@ -352,8 +399,10 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
         return;
       }
 
+      const submittedAt = json.submittedAt ?? json.profile?.applicationSubmittedAt ?? new Date().toISOString();
       if (json.profile) setProfile(json.profile as ProfileData);
-      setSubmitSuccess(`Заявка отправлена: ${formatDate(json.submittedAt ?? new Date().toISOString())}`);
+      setLastSubmittedStatus(`Последняя заявка отправлена: ${formatDate(submittedAt)}`);
+      setToastMessage("Заявка подана");
     } catch {
       setError("Ошибка сети при отправке заявки.");
     } finally {
@@ -383,6 +432,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
 
   return (
     <div className="min-h-screen bg-[#F7FAFC]">
+      <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
       <div className="h-16" />
 
       <div className="max-w-3xl mx-auto px-4 py-12">
@@ -395,9 +445,11 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
           <p className="text-sm text-[#4A5568]">
             {userKind === "candidate"
               ? "После нажатия кнопки внизу мы сохраним профиль и отправим заявку владельцу сервиса."
-              : "Выбери компанию и заполни данные, чтобы получать обращения от кандидатов."}
+              : "Выбери компанию и оставь контакты, чтобы получать обращения от кандидатов."}
           </p>
-          {submitSuccess && <p className="text-sm text-green-700 mt-2">{submitSuccess}</p>}
+          {userKind === "candidate" && lastSubmittedStatus && (
+            <p className="text-sm text-green-700 mt-2">{lastSubmittedStatus}</p>
+          )}
         </div>
 
         {error && (
@@ -510,10 +562,10 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
         {userKind === "candidate" ? (
           <>
             <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-              <h3 className="text-base font-bold text-[#171923] mb-4">Обязательные поля</h3>
+              <h3 className="text-base font-bold text-[#171923] mb-4">Основные данные</h3>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-[#4A5568] mb-2">Роли (можно несколько)</label>
+                <FieldLabel required>Роли (можно несколько)</FieldLabel>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {ROLES.map((role) => {
                     const active = form.roles.includes(role);
@@ -535,7 +587,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
                   <input
                     type="text"
                     value={customRole}
-                    onChange={(e) => setCustomRole(e.target.value)}
+                    onChange={(event) => setCustomRole(event.target.value)}
                     placeholder="Своя роль"
                     className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
                   />
@@ -550,9 +602,18 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
                 {form.roles.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {form.roles.map((role) => (
-                      <span key={role} className="inline-flex items-center gap-2 rounded-full bg-[#EBF4FF] px-3 py-1 text-xs font-medium text-[#1863e5]">
+                      <span
+                        key={role}
+                        className="inline-flex items-center gap-2 rounded-full bg-[#EBF4FF] px-3 py-1 text-xs font-medium text-[#1863e5]"
+                      >
                         {role}
-                        <button type="button" onClick={() => removeRole(role)} className="text-[#1550c0] hover:text-[#0f3d92]">×</button>
+                        <button
+                          type="button"
+                          onClick={() => removeRole(role)}
+                          className="text-[#1550c0] hover:text-[#0f3d92]"
+                        >
+                          ×
+                        </button>
                       </span>
                     ))}
                   </div>
@@ -561,22 +622,22 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
 
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Опыт (лет)</label>
+                  <FieldLabel required>Опыт (лет)</FieldLabel>
                   <input
                     type="number"
                     min={0}
                     max={50}
                     value={form.experience}
-                    onChange={(e) => updateForm("experience", Number(e.target.value) || 0)}
+                    onChange={(event) => updateForm("experience", Number(event.target.value) || 0)}
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] outline-none focus:border-[#1863e5]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Локация</label>
+                  <FieldLabel optional>Локация</FieldLabel>
                   <input
                     type="text"
                     value={form.location}
-                    onChange={(e) => updateForm("location", e.target.value)}
+                    onChange={(event) => updateForm("location", event.target.value)}
                     placeholder="Москва"
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
                   />
@@ -584,35 +645,27 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#4A5568] mb-2">Компании (можно несколько)</label>
-                <div className="max-h-44 overflow-y-auto rounded-xl border border-gray-200 p-3">
-                  <div className="flex flex-wrap gap-2">
-                    {COMPANIES_META.map((c) => {
-                      const active = form.companies.includes(c.name);
-                      return (
-                        <button
-                          key={c.slug}
-                          type="button"
-                          onClick={() => toggleCompany(c.name)}
-                          className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                            active ? "bg-[#1863e5] text-white" : "bg-[#F7FAFC] text-[#4A5568] hover:bg-[#EBF4FF]"
-                          }`}
-                        >
-                          {c.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <FieldLabel required>Компании</FieldLabel>
+                <CompanyPicker
+                  options={COMPANY_OPTIONS}
+                  values={form.companies}
+                  onChange={(values) => updateForm("companies", values)}
+                  multiple
+                  placeholder="Поиск компании или добавление своей"
+                />
               </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-              <h3 className="text-base font-bold text-[#171923] mb-2">Резюме</h3>
-              <p className="text-xs text-[#A0AEC0] mb-4">Нужен хотя бы один способ: файл, ссылка или текст.</p>
+              <div className="mb-4">
+                <FieldLabel required>Резюме</FieldLabel>
+                <p className="text-xs text-[#718096]">
+                  Нужен хотя бы один способ: файл, ссылка или текст.
+                </p>
+              </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-[#4A5568] mb-1.5">1) Загрузить файл (PDF/DOCX)</label>
+                <FieldLabel optional>1) Загрузить файл (PDF/DOCX)</FieldLabel>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -651,21 +704,21 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-[#4A5568] mb-1.5">2) Ссылка на резюме</label>
+                <FieldLabel optional>2) Ссылка на резюме</FieldLabel>
                 <input
                   type="url"
                   value={form.resumeUrl}
-                  onChange={(e) => updateForm("resumeUrl", e.target.value)}
+                  onChange={(event) => updateForm("resumeUrl", event.target.value)}
                   placeholder="https://..."
                   className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#4A5568] mb-1.5">3) Текст резюме</label>
+                <FieldLabel optional>3) Текст резюме</FieldLabel>
                 <textarea
                   value={form.resumeText}
-                  onChange={(e) => updateForm("resumeText", e.target.value)}
+                  onChange={(event) => updateForm("resumeText", event.target.value)}
                   rows={8}
                   placeholder="Вставь текст резюме"
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5] resize-none"
@@ -678,31 +731,41 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
 
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#4A5568] mb-1.5">LinkedIn</label>
+                  <FieldLabel optional>Telegram для связи</FieldLabel>
+                  <input
+                    type="text"
+                    value={form.telegramContact}
+                    onChange={(event) => updateForm("telegramContact", event.target.value)}
+                    placeholder="@username"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+                  />
+                </div>
+                <div>
+                  <FieldLabel optional>LinkedIn</FieldLabel>
                   <input
                     type="url"
                     value={form.linkedinUrl}
-                    onChange={(e) => updateForm("linkedinUrl", e.target.value)}
+                    onChange={(event) => updateForm("linkedinUrl", event.target.value)}
                     placeholder="https://linkedin.com/in/..."
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[#4A5568] mb-1.5">GitHub</label>
+                  <FieldLabel optional>GitHub</FieldLabel>
                   <input
                     type="url"
                     value={form.githubUrl}
-                    onChange={(e) => updateForm("githubUrl", e.target.value)}
+                    onChange={(event) => updateForm("githubUrl", event.target.value)}
                     placeholder="https://github.com/..."
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
                   />
                 </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-[#4A5568] mb-1.5">Личный сайт</label>
+                <div>
+                  <FieldLabel optional>Личный сайт</FieldLabel>
                   <input
                     type="url"
                     value={form.siteUrl}
-                    onChange={(e) => updateForm("siteUrl", e.target.value)}
+                    onChange={(event) => updateForm("siteUrl", event.target.value)}
                     placeholder="https://..."
                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
                   />
@@ -710,12 +773,15 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
-                  О себе <span className="text-[#A0AEC0]">({form.bio.length}/700)</span>
-                </label>
+                <FieldLabel
+                  optional
+                  extra={<span className="text-[#A0AEC0]">({form.bio.length}/700)</span>}
+                >
+                  О себе
+                </FieldLabel>
                 <textarea
                   value={form.bio}
-                  onChange={(e) => updateForm("bio", e.target.value.slice(0, 700))}
+                  onChange={(event) => updateForm("bio", event.target.value.slice(0, 700))}
                   rows={4}
                   placeholder="Коротко о себе"
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5] resize-none"
@@ -723,11 +789,12 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
               </div>
 
               <div className="flex flex-col gap-3">
+                <p className="text-xs font-medium text-[#718096]">Ниже два опциональных переключателя</p>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.openToRelocation}
-                    onChange={(e) => updateForm("openToRelocation", e.target.checked)}
+                    onChange={(event) => updateForm("openToRelocation", event.target.checked)}
                     className="w-4 h-4"
                   />
                   <span className="text-sm text-[#4A5568]">Готов к переезду</span>
@@ -736,7 +803,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
                   <input
                     type="checkbox"
                     checked={form.isPublic}
-                    onChange={(e) => updateForm("isPublic", e.target.checked)}
+                    onChange={(event) => updateForm("isPublic", event.target.checked)}
                     className="w-4 h-4"
                   />
                   <span className="text-sm text-[#4A5568]">Показывать профиль в базе рефереров</span>
@@ -752,30 +819,43 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
             </p>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
-                Компания <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={referrerForm.company}
-                onChange={(e) => setReferrerForm((prev) => ({ ...prev, company: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] outline-none focus:border-[#1863e5] bg-white"
-              >
-                <option value="">Выбери компанию</option>
-                {COMPANIES_META.map((c) => (
-                  <option key={c.slug} value={c.name}>{c.name}</option>
-                ))}
-              </select>
+              <FieldLabel required>Компания</FieldLabel>
+              <CompanyPicker
+                options={COMPANY_OPTIONS}
+                values={referrerForm.company ? [referrerForm.company] : []}
+                onChange={(values) =>
+                  setReferrerForm((prev) => ({ ...prev, company: values[0] ?? "" }))
+                }
+                multiple={false}
+                placeholder="Поиск компании или добавление своей"
+              />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[#4A5568] mb-1.5">LinkedIn</label>
-              <input
-                type="url"
-                value={referrerForm.linkedinUrl}
-                onChange={(e) => setReferrerForm((prev) => ({ ...prev, linkedinUrl: e.target.value }))}
-                placeholder="https://linkedin.com/in/..."
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
-              />
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <FieldLabel optional>Telegram для связи</FieldLabel>
+                <input
+                  type="text"
+                  value={referrerForm.telegramContact}
+                  onChange={(event) =>
+                    setReferrerForm((prev) => ({ ...prev, telegramContact: event.target.value }))
+                  }
+                  placeholder="@username"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+                />
+              </div>
+              <div>
+                <FieldLabel optional>LinkedIn</FieldLabel>
+                <input
+                  type="url"
+                  value={referrerForm.linkedinUrl}
+                  onChange={(event) =>
+                    setReferrerForm((prev) => ({ ...prev, linkedinUrl: event.target.value }))
+                  }
+                  placeholder="https://linkedin.com/in/..."
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+                />
+              </div>
             </div>
 
             {referrer && (
@@ -794,8 +874,12 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
             className="w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors disabled:opacity-60"
           >
             {submitting
-              ? userKind === "candidate" ? "Отправляю заявку..." : "Сохраняю профиль..."
-              : userKind === "candidate" ? "Подать заявку" : "Сохранить профиль реферала"}
+              ? userKind === "candidate"
+                ? "Отправляю заявку..."
+                : "Сохраняю профиль..."
+              : userKind === "candidate"
+                ? "Подать заявку"
+                : "Сохранить профиль реферала"}
           </button>
         </div>
       </div>

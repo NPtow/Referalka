@@ -47,6 +47,7 @@ export async function sendApplicationEmail(params: {
     <p><b>Компании:</b> ${formatHtml(payload.companies.join(", "))}</p>
     <p><b>Локация:</b> ${formatHtml(payload.location)}</p>
     <p><b>Готов к переезду:</b> ${payload.openToRelocation ? "Да" : "Нет"}</p>
+    <p><b>Telegram:</b> ${formatHtml(payload.telegramContact)}</p>
     <p><b>Резюме (файл):</b> ${payload.resumeFileUrl ? `<a href="${payload.resumeFileUrl}" target="_blank" rel="noreferrer">Скачать</a>` : "—"}</p>
     <p><b>Резюме (ссылка):</b> ${payload.resumeUrl ? `<a href="${payload.resumeUrl}" target="_blank" rel="noreferrer">${payload.resumeUrl}</a>` : "—"}</p>
     <p><b>LinkedIn:</b> ${payload.linkedinUrl ? `<a href="${payload.linkedinUrl}" target="_blank" rel="noreferrer">${payload.linkedinUrl}</a>` : "—"}</p>

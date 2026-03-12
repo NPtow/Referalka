@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const user = await resolveCurrentAppUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { company, linkedinUrl } = await req.json();
+    const { company, linkedinUrl, telegramContact } = await req.json();
 
     if (!company) {
       return NextResponse.json({ error: "company required" }, { status: 400 });
@@ -15,8 +15,17 @@ export async function POST(req: NextRequest) {
 
     const referrer = await prisma.referrer.upsert({
       where: { userId: user.id },
-      update: { company, linkedinUrl: linkedinUrl || null },
-      create: { userId: user.id, company, linkedinUrl: linkedinUrl || null },
+      update: {
+        company,
+        linkedinUrl: linkedinUrl || null,
+        telegramContact: telegramContact || null,
+      },
+      create: {
+        userId: user.id,
+        company,
+        linkedinUrl: linkedinUrl || null,
+        telegramContact: telegramContact || null,
+      },
       include: { user: { select: { firstName: true, username: true } } },
     });
 

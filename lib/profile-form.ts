@@ -11,6 +11,7 @@ export type ProfileFormPayload = {
   resumeFileMime: string | null;
   resumeFileSize: number | null;
   resumeText: string | null;
+  telegramContact: string | null;
   linkedinUrl: string | null;
   githubUrl: string | null;
   siteUrl: string | null;
@@ -64,6 +65,7 @@ export function normalizeProfilePayload(raw: unknown): ProfileFormPayload {
     resumeFileMime: normalizeString(body.resumeFileMime),
     resumeFileSize: normalizeFileSize(body.resumeFileSize),
     resumeText: normalizeString(body.resumeText),
+    telegramContact: normalizeString(body.telegramContact),
     linkedinUrl: normalizeString(body.linkedinUrl),
     githubUrl: normalizeString(body.githubUrl),
     siteUrl: normalizeString(body.siteUrl),
@@ -100,6 +102,7 @@ export function payloadToProfileCreateUpdate(payload: ProfileFormPayload) {
     resumeFileMime: payload.resumeFileMime,
     resumeFileSize: payload.resumeFileSize,
     resumeText: payload.resumeText,
+    telegramContact: payload.telegramContact,
     linkedinUrl: payload.linkedinUrl,
     githubUrl: payload.githubUrl,
     siteUrl: payload.siteUrl,
@@ -122,6 +125,7 @@ export function profileToPayload(profile: Pick<Profile,
   | "resumeFileMime"
   | "resumeFileSize"
   | "resumeText"
+  | "telegramContact"
   | "linkedinUrl"
   | "githubUrl"
   | "siteUrl"
@@ -140,6 +144,7 @@ export function profileToPayload(profile: Pick<Profile,
     resumeFileMime: profile.resumeFileMime,
     resumeFileSize: profile.resumeFileSize,
     resumeText: profile.resumeText,
+    telegramContact: profile.telegramContact,
     linkedinUrl: profile.linkedinUrl,
     githubUrl: profile.githubUrl,
     siteUrl: profile.siteUrl,
@@ -157,6 +162,7 @@ export function buildProfileSummary(payload: ProfileFormPayload): string {
     payload.location && `Локация: ${payload.location}`,
     payload.openToRelocation ? "Готов к переезду" : null,
     payload.bio && `О себе: ${payload.bio}`,
+    payload.telegramContact && `Telegram: ${payload.telegramContact}`,
     payload.resumeFileUrl && `Резюме (файл): ${payload.resumeFileUrl}`,
     payload.resumeUrl && `Резюме (ссылка): ${payload.resumeUrl}`,
     payload.linkedinUrl && `LinkedIn: ${payload.linkedinUrl}`,

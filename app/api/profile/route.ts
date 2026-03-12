@@ -88,6 +88,7 @@ export async function PATCH(req: NextRequest) {
       resumeFileName: true,
       resumeFileMime: true,
       resumeFileSize: true,
+      telegramContact: true,
       linkedinUrl: true,
       githubUrl: true,
       siteUrl: true,
