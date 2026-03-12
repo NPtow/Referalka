@@ -1,12 +1,7 @@
-"use client";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
-import { authClient } from "@/lib/auth-client";
 
-export default function Hero() {
-  const { data: session } = authClient.useSession();
-  const isSignedIn = Boolean(session?.user);
-
+export default function Hero({ isSignedIn }: { isSignedIn: boolean }) {
   return (
     <section className="bg-[#F7FAFC] flex flex-col items-center justify-center px-4 pt-28 pb-20 text-center relative overflow-hidden">
       <h1
@@ -45,7 +40,6 @@ export default function Hero() {
         </Link>
       </div>
 
-      {/* notification previews */}
       <div className="flex flex-col sm:flex-row gap-3 mt-12 text-left">
         <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#4A5568] shadow-sm">
           🎉 Тебя зареферили в <strong className="text-[#171923]">Яндекс</strong>
