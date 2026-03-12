@@ -5,10 +5,12 @@ import { createAuthClient } from "better-auth/react";
 const serverBaseURL = process.env.BETTER_AUTH_URL
   || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
 
-const baseURL =
+const clientBaseURL =
   typeof window === "undefined"
-    ? new URL("/api/auth", serverBaseURL).toString()
-    : "/api/auth";
+    ? serverBaseURL
+    : window.location.origin;
+
+const baseURL = new URL("/api/auth", clientBaseURL).toString();
 
 export const authClient = createAuthClient({
   baseURL,
