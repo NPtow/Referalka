@@ -3,9 +3,9 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
 import { COMPANIES_META } from "@/lib/constants";
 import VacancyCard from "@/components/ui/VacancyCard";
+import { authClient } from "@/lib/auth-client";
 
 interface Vacancy {
   id: string;
@@ -27,7 +27,8 @@ type ModalState = null | "auth" | "payment" | "success" | "referral-sent" | "nee
 export default function CompanyPage() {
   const { slug } = useParams<{ slug: string }>();
   const company = COMPANIES_META.find((c) => c.slug === slug);
-  const { isSignedIn } = useUser();
+  const { data: session } = authClient.useSession();
+  const isSignedIn = Boolean(session?.user);
 
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   const [loading, setLoading] = useState(true);
@@ -249,16 +250,18 @@ export default function CompanyPage() {
             </h3>
             <p className="text-sm text-[#718096] mb-6">Чтобы отправить запрос, нужно авторизоваться</p>
             <div className="flex gap-2">
-              <SignInButton mode="modal">
-                <button className="flex-1 rounded-xl bg-[#1863e5] text-white font-semibold py-3 hover:bg-[#1550c0] transition-colors">
-                  Войти
-                </button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="flex-1 rounded-xl border border-gray-200 text-[#171923] font-semibold py-3 hover:bg-gray-50 transition-colors">
-                  Регистрация
-                </button>
-              </SignUpButton>
+              <Link
+                href="/sign-in"
+                className="flex-1 rounded-xl bg-[#1863e5] text-white font-semibold py-3 hover:bg-[#1550c0] transition-colors text-center"
+              >
+                Войти
+              </Link>
+              <Link
+                href="/sign-up"
+                className="flex-1 rounded-xl border border-gray-200 text-[#171923] font-semibold py-3 hover:bg-gray-50 transition-colors text-center"
+              >
+                Регистрация
+              </Link>
             </div>
             <button
               onClick={() => setModal(null)}

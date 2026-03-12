@@ -3,13 +3,21 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SignInButton, SignUpButton, UserButton, useUser } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 import Button from "@/components/ui/Button";
 
 export default function Navbar() {
   const pathname = usePathname();
-  const { isSignedIn } = useUser();
+  const sessionState = authClient.useSession();
+  const isSignedIn = Boolean(sessionState.data?.user);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const displayInitial = sessionState.data?.user.name?.[0]?.toUpperCase() || sessionState.data?.user.email?.[0]?.toUpperCase() || "U";
+
+  const handleSignOut = async () => {
+    await authClient.signOut();
+    window.location.href = "/";
+  };
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -59,17 +67,22 @@ export default function Navbar() {
             )}
 
             {isSignedIn ? (
-              <UserButton />
+              <button
+                onClick={handleSignOut}
+                className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-[#1863e5] text-white font-bold text-sm hover:bg-[#1550c0] transition-colors"
+                aria-label="Выйти"
+                title="Выйти"
+              >
+                {displayInitial}
+              </button>
             ) : (
               <div className="flex items-center gap-2">
-                <SignInButton mode="modal">
-                  <button className="text-sm text-gray-500 hover:text-[#171923] transition-colors px-2 py-1.5">
-                    Войти
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
+                <Link href="/sign-in" className="text-sm text-gray-500 hover:text-[#171923] transition-colors px-2 py-1.5">
+                  Войти
+                </Link>
+                <Link href="/sign-up">
                   <Button size="sm">Регистрация</Button>
-                </SignUpButton>
+                </Link>
               </div>
             )}
           </div>
@@ -116,21 +129,26 @@ export default function Navbar() {
             )}
 
             {isSignedIn ? (
-              <div className="px-3 py-3">
-                <UserButton />
-              </div>
+              <button
+                onClick={handleSignOut}
+                className="w-full px-3 py-3 rounded-xl bg-[#1863e5] text-white font-semibold hover:bg-[#1550c0] transition-colors"
+              >
+                Выйти
+              </button>
             ) : (
               <div className="px-3 py-2 flex flex-col gap-2">
-                <SignInButton mode="modal">
-                  <button className="w-full py-3 rounded-xl border border-gray-200 text-[#171923] font-semibold hover:bg-gray-50 transition-colors">
-                    Войти
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="w-full py-3 rounded-xl bg-[#1863e5] text-white font-semibold hover:bg-[#1550c0] transition-colors">
-                    Регистрация
-                  </button>
-                </SignUpButton>
+                <Link
+                  href="/sign-in"
+                  className="w-full py-3 rounded-xl border border-gray-200 text-[#171923] font-semibold hover:bg-gray-50 transition-colors text-center"
+                >
+                  Войти
+                </Link>
+                <Link
+                  href="/sign-up"
+                  className="w-full py-3 rounded-xl bg-[#1863e5] text-white font-semibold hover:bg-[#1550c0] transition-colors text-center"
+                >
+                  Регистрация
+                </Link>
               </div>
             )}
           </div>

@@ -2,7 +2,7 @@ const steps = [
   {
     num: "01",
     title: "Создай аккаунт",
-    desc: "Нажми Sign Up или Sign In и войди через Clerk за пару кликов.",
+    desc: "Нажми Sign Up или Sign In и войди по email и паролю за пару кликов.",
   },
   {
     num: "02",

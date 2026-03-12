@@ -1,16 +1,12 @@
-"use client";
+import { redirect } from "next/navigation";
+import EmailAuthForm from "@/components/auth/EmailAuthForm";
+import { getBetterAuthSession } from "@/lib/auth-session";
 
-import { SignIn } from "@clerk/nextjs";
+export default async function SignInPage() {
+  const session = await getBetterAuthSession();
+  if (session) {
+    redirect("/profile");
+  }
 
-export default function SignInPage() {
-  return (
-    <div className="min-h-screen bg-[#F7FAFC] flex items-center justify-center px-4">
-      <SignIn
-        path="/sign-in"
-        routing="path"
-        signUpUrl="/sign-up"
-        forceRedirectUrl="/profile"
-      />
-    </div>
-  );
+  return <EmailAuthForm mode="sign-in" />;
 }

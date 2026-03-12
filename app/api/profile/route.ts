@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getBetterAuthSession } from "@/lib/auth-session";
 import { resolveCurrentAppUser } from "@/lib/resolve-current-app-user";
 import {
   normalizeProfilePayload,
@@ -51,8 +52,9 @@ export async function GET() {
 }
 
 export async function DELETE() {
+  const session = await getBetterAuthSession();
   const user = await resolveCurrentAppUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.id || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const profile = await prisma.profile.findUnique({ where: { userId: user.id } });
   if (profile) {
@@ -63,6 +65,9 @@ export async function DELETE() {
   await prisma.referrer.deleteMany({ where: { userId: user.id } });
   await prisma.referralRequest.deleteMany({ where: { userId: user.id } });
   await prisma.user.delete({ where: { id: user.id } });
+  await prisma.authSession.deleteMany({ where: { userId: session.user.id } });
+  await prisma.authAccount.deleteMany({ where: { userId: session.user.id } });
+  await prisma.authUser.delete({ where: { id: session.user.id } });
 
   return NextResponse.json({ ok: true });
 }

@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Inter_Tight, DM_Sans } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
-import ClerkSessionBridge from "@/components/ClerkSessionBridge";
 
 const interTight = Inter_Tight({
   variable: "--font-inter-tight",
@@ -51,16 +49,8 @@ ym(107181480, 'init', {
             <img src="https://mc.yandex.ru/watch/107181480" style={{ position: "absolute", left: "-9999px" }} alt="" />
           </div>
         </noscript>
-        <ClerkProvider
-          signInUrl="/sign-in"
-          signUpUrl="/sign-up"
-          signInFallbackRedirectUrl="/profile"
-          signUpFallbackRedirectUrl="/profile"
-        >
-          <ClerkSessionBridge />
-          <Navbar />
-          {children}
-        </ClerkProvider>
+        <Navbar />
+        {children}
       </body>
     </html>
   );

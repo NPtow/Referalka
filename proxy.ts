@@ -1,7 +1,4 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-
-const isProtectedRoute = createRouteMatcher(["/profile(.*)"]);
 
 function isLegacyUserRoute(pathname: string): boolean {
   return (
@@ -14,8 +11,9 @@ function isLegacyUserRoute(pathname: string): boolean {
   );
 }
 
-export default clerkMiddleware(async (auth, req) => {
-  const { pathname } = req.nextUrl;
+export default async function proxy(req: Request) {
+  const url = new URL(req.url);
+  const { pathname } = url;
 
   if (isLegacyUserRoute(pathname)) {
     return NextResponse.redirect(new URL("/profile", req.url));
@@ -29,13 +27,8 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  if (isProtectedRoute(req)) {
-    await auth.protect();
-  }
-}, {
-  signInUrl: "/sign-in",
-  signUpUrl: "/sign-up",
-});
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: [

@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { Prisma } from "@prisma/client";
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { getBetterAuthSession } from "@/lib/auth-session";
 
 const MAX_INT_32 = 2_147_483_647;
 
@@ -28,12 +28,12 @@ async function createUserWithStableId({
   email,
   firstName,
   photoUrl,
-  clerkUserId,
+  betterAuthUserId,
 }: {
   email: string;
   firstName: string;
   photoUrl: string | null;
-  clerkUserId: string;
+  betterAuthUserId: string;
 }): Promise<AppUser> {
   let candidateId = hashEmailToId(email);
 
@@ -55,14 +55,14 @@ async function createUserWithStableId({
           firstName,
           username: email,
           photoUrl,
-          clerkUserId,
+          betterAuthUserId,
         },
         create: {
           id: candidateId,
           firstName,
           username: email,
           photoUrl,
-          clerkUserId,
+          betterAuthUserId,
         },
         include: { profile: true, referrer: true },
       });
@@ -75,51 +75,43 @@ async function createUserWithStableId({
     }
   }
 
-  throw new Error("Could not allocate user id for Clerk user");
+  throw new Error("Could not allocate user id for Better Auth user");
 }
 
 export async function resolveCurrentAppUser(): Promise<AppUser | null> {
-  const session = await auth();
-  if (!session.userId) {
+  const session = await getBetterAuthSession();
+  if (!session?.user?.id || !session.user.email) {
     return null;
   }
 
-  const clerkUser = await currentUser();
-  if (!clerkUser) {
-    return null;
-  }
+  const email = normalizeEmail(session.user.email);
+  const betterAuthUserId = session.user.id;
+  const firstName = session.user.name?.trim() || buildNameFromEmail(email);
+  const photoUrl = session.user.image ?? null;
 
-  const primaryEmail =
-    clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress ??
-    clerkUser.emailAddresses[0]?.emailAddress;
-
-  if (!primaryEmail) {
-    throw new Error("No email in Clerk profile");
-  }
-
-  const email = normalizeEmail(primaryEmail);
-  const clerkUserId = clerkUser.id;
-  const firstName = clerkUser.firstName?.trim() || clerkUser.username?.trim() || buildNameFromEmail(email);
-  const photoUrl = clerkUser.imageUrl ?? null;
-
-  const existingByClerkId = await prisma.user.findUnique({
-    where: { clerkUserId },
+  const existingByAuthId = await prisma.user.findUnique({
+    where: { betterAuthUserId },
     include: { profile: true, referrer: true },
   });
 
-  if (existingByClerkId) {
+  if (existingByAuthId) {
     if (
-      existingByClerkId.firstName !== firstName ||
-      existingByClerkId.username !== email ||
-      existingByClerkId.photoUrl !== photoUrl
+      existingByAuthId.firstName !== firstName ||
+      existingByAuthId.username !== email ||
+      existingByAuthId.photoUrl !== photoUrl
     ) {
       return prisma.user.update({
-        where: { id: existingByClerkId.id },
-        data: { firstName, username: email, photoUrl },
+        where: { id: existingByAuthId.id },
+        data: {
+          firstName,
+          username: email,
+          photoUrl,
+        },
         include: { profile: true, referrer: true },
       });
     }
-    return existingByClerkId;
+
+    return existingByAuthId;
   }
 
   const existingByEmail = await prisma.user.findFirst({
@@ -131,7 +123,7 @@ export async function resolveCurrentAppUser(): Promise<AppUser | null> {
     return prisma.user.update({
       where: { id: existingByEmail.id },
       data: {
-        clerkUserId,
+        betterAuthUserId,
         firstName,
         username: email,
         photoUrl,
@@ -140,5 +132,5 @@ export async function resolveCurrentAppUser(): Promise<AppUser | null> {
     });
   }
 
-  return createUserWithStableId({ email, firstName, photoUrl, clerkUserId });
+  return createUserWithStableId({ email, firstName, photoUrl, betterAuthUserId });
 }

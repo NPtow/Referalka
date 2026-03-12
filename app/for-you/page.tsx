@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 
 interface StubVacancy {
   id: string;
@@ -86,13 +86,14 @@ const LEVEL_COLORS: Record<string, string> = {
 type ModalState = null | "auth" | "need-profile" | "payment" | "success";
 
 export default function ForYouPage() {
-  const { isSignedIn, user } = useUser();
+  const { data: session } = authClient.useSession();
+  const isSignedIn = Boolean(session?.user);
   const [modal, setModal] = useState<ModalState>(null);
   const [selectedVacancy, setSelectedVacancy] = useState<StubVacancy | null>(null);
   const [hasProfile, setHasProfile] = useState(false);
 
   const displayName =
-    user?.firstName?.trim() || user?.username?.trim() || user?.primaryEmailAddress?.emailAddress?.split("@")[0] || "Пользователь";
+    session?.user.name?.trim() || session?.user.email?.split("@")[0] || "Пользователь";
 
   useEffect(() => {
     if (!isSignedIn) {
@@ -162,11 +163,12 @@ export default function ForYouPage() {
                     <span>👤</span>
                   </div>
                   <p className="text-sm text-[#718096] mb-3">Войди, чтобы видеть персональные вакансии</p>
-                  <SignInButton mode="modal">
-                    <button className="w-full text-sm bg-[#1863e5] text-white font-semibold py-2 rounded-xl hover:bg-[#1550c0] transition-colors">
-                      Войти
-                    </button>
-                  </SignInButton>
+                  <Link
+                    href="/sign-in"
+                    className="block w-full text-sm bg-[#1863e5] text-white font-semibold py-2 rounded-xl hover:bg-[#1550c0] transition-colors text-center"
+                  >
+                    Войти
+                  </Link>
                 </>
               )}
             </div>
@@ -269,16 +271,18 @@ export default function ForYouPage() {
             </h3>
             <p className="text-sm text-[#718096] mb-6">Чтобы отправить запрос, нужно авторизоваться</p>
             <div className="flex gap-2">
-              <SignInButton mode="modal">
-                <button className="flex-1 rounded-xl bg-[#1863e5] text-white font-semibold py-3 hover:bg-[#1550c0] transition-colors">
-                  Войти
-                </button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="flex-1 rounded-xl border border-gray-200 text-[#171923] font-semibold py-3 hover:bg-gray-50 transition-colors">
-                  Регистрация
-                </button>
-              </SignUpButton>
+              <Link
+                href="/sign-in"
+                className="flex-1 rounded-xl bg-[#1863e5] text-white font-semibold py-3 hover:bg-[#1550c0] transition-colors text-center"
+              >
+                Войти
+              </Link>
+              <Link
+                href="/sign-up"
+                className="flex-1 rounded-xl border border-gray-200 text-[#171923] font-semibold py-3 hover:bg-gray-50 transition-colors text-center"
+              >
+                Регистрация
+              </Link>
             </div>
             <button
               onClick={() => setModal(null)}

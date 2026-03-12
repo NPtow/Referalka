@@ -2,12 +2,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { SignInButton, SignUpButton, useUser } from "@clerk/nextjs";
 import { COMPANIES_META } from "@/lib/constants";
+import { authClient } from "@/lib/auth-client";
 
 export default function ReferrerPage() {
   const router = useRouter();
-  const { isSignedIn, user } = useUser();
+  const { data: session } = authClient.useSession();
+  const isSignedIn = Boolean(session?.user);
 
   const [company, setCompany] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
@@ -15,7 +16,7 @@ export default function ReferrerPage() {
   const [done, setDone] = useState(false);
 
   const displayName =
-    user?.firstName?.trim() || user?.username?.trim() || user?.primaryEmailAddress?.emailAddress?.split("@")[0] || "Пользователь";
+    session?.user.name?.trim() || session?.user.email?.split("@")[0] || "Пользователь";
 
   const handleSave = async () => {
     if (!company) return;
@@ -51,18 +52,20 @@ export default function ReferrerPage() {
 
           {!isSignedIn ? (
             <div>
-              <p className="text-sm text-[#4A5568] mb-4 text-center">Войди через Clerk, чтобы продолжить</p>
+              <p className="text-sm text-[#4A5568] mb-4 text-center">Войди по email, чтобы продолжить</p>
               <div className="flex justify-center gap-2">
-                <SignInButton mode="modal">
-                  <button className="rounded-xl bg-[#1863e5] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1550c0] transition-colors">
-                    Войти
-                  </button>
-                </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-[#171923] hover:bg-gray-50 transition-colors">
-                    Регистрация
-                  </button>
-                </SignUpButton>
+                <Link
+                  href="/sign-in"
+                  className="rounded-xl bg-[#1863e5] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1550c0] transition-colors"
+                >
+                  Войти
+                </Link>
+                <Link
+                  href="/sign-up"
+                  className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-[#171923] hover:bg-gray-50 transition-colors"
+                >
+                  Регистрация
+                </Link>
               </div>
             </div>
           ) : done ? (

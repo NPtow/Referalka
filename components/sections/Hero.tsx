@@ -1,9 +1,12 @@
 "use client";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
-import { Show, SignInButton, SignUpButton } from "@clerk/nextjs";
+import { authClient } from "@/lib/auth-client";
 
 export default function Hero() {
+  const { data: session } = authClient.useSession();
+  const isSignedIn = Boolean(session?.user);
+
   return (
     <section className="bg-[#F7FAFC] flex flex-col items-center justify-center px-4 pt-28 pb-20 text-center relative overflow-hidden">
       <h1
@@ -20,21 +23,20 @@ export default function Hero() {
       </p>
 
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-center">
-        <Show when="signed-in">
+        {isSignedIn ? (
           <Link href="/profile">
             <Button size="lg">Открыть мой профиль →</Button>
           </Link>
-        </Show>
-        <Show when="signed-out">
-          <SignUpButton mode="modal">
-            <Button size="lg">Получить реферал →</Button>
-          </SignUpButton>
-          <SignInButton mode="modal">
-            <button className="text-sm font-medium text-[#4A5568] hover:text-[#1863e5] transition-colors px-4 py-2">
+        ) : (
+          <>
+            <Link href="/sign-up">
+              <Button size="lg">Получить реферал →</Button>
+            </Link>
+            <Link href="/sign-in" className="text-sm font-medium text-[#4A5568] hover:text-[#1863e5] transition-colors px-4 py-2">
               Уже есть аккаунт
-            </button>
-          </SignInButton>
-        </Show>
+            </Link>
+          </>
+        )}
         <Link
           href="/referrer"
           className="text-sm font-medium text-[#4A5568] hover:text-[#1863e5] transition-colors px-4 py-2"
