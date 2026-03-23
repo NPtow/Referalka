@@ -2,34 +2,102 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { resolveCurrentAppUser } from "@/lib/resolve-current-app-user";
 
+function normalizeString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    normalized.push(trimmed);
+  }
+
+  return normalized;
+}
+
+function serializeReferrer(referrer: {
+  id: string;
+  userId: number;
+  company: string;
+  companies: string[];
+  role: string | null;
+  roles: string[];
+  telegramContact: string | null;
+  linkedinUrl: string | null;
+  createdAt: Date;
+}) {
+  const companies = referrer.companies.length ? referrer.companies : [referrer.company];
+  const roles = referrer.roles.length ? referrer.roles : referrer.role ? [referrer.role] : [];
+
+  return {
+    ...referrer,
+    companies,
+    company: companies[0] ?? referrer.company ?? null,
+    roles,
+    role: roles[0] ?? referrer.role ?? null,
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await resolveCurrentAppUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { company, linkedinUrl, telegramContact } = await req.json();
+    const body = await req.json();
+    const companies = normalizeStringArray(body.companies);
+    const fallbackCompany = normalizeString(body.company);
+    const resolvedCompanies = companies.length ? companies : fallbackCompany ? [fallbackCompany] : [];
+    const roles = normalizeStringArray(body.roles);
+    const fallbackRole = normalizeString(body.role);
+    const resolvedRoles = roles.length ? roles : fallbackRole ? [fallbackRole] : [];
+    const linkedinUrl = normalizeString(body.linkedinUrl);
+    const telegramContact = normalizeString(body.telegramContact);
 
-    if (!company) {
-      return NextResponse.json({ error: "company required" }, { status: 400 });
+    if (!resolvedCompanies.length) {
+      return NextResponse.json({ error: "companies required" }, { status: 400 });
+    }
+
+    if (!resolvedRoles.length) {
+      return NextResponse.json({ error: "roles required" }, { status: 400 });
     }
 
     const referrer = await prisma.referrer.upsert({
       where: { userId: user.id },
       update: {
-        company,
-        linkedinUrl: linkedinUrl || null,
-        telegramContact: telegramContact || null,
+        company: resolvedCompanies[0],
+        companies: resolvedCompanies,
+        role: resolvedRoles[0],
+        roles: resolvedRoles,
+        linkedinUrl,
+        telegramContact,
       },
       create: {
         userId: user.id,
-        company,
-        linkedinUrl: linkedinUrl || null,
-        telegramContact: telegramContact || null,
+        company: resolvedCompanies[0],
+        companies: resolvedCompanies,
+        role: resolvedRoles[0],
+        roles: resolvedRoles,
+        linkedinUrl,
+        telegramContact,
       },
       include: { user: { select: { firstName: true, username: true } } },
     });
 
-    return NextResponse.json({ referrer });
+    return NextResponse.json({ referrer: serializeReferrer(referrer) });
   } catch (e) {
     console.error("[referrer POST]", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
@@ -44,5 +112,5 @@ export async function GET() {
     where: { userId: user.id },
   });
 
-  return NextResponse.json({ referrer });
+  return NextResponse.json({ referrer: referrer ? serializeReferrer(referrer) : null });
 }

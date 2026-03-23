@@ -39,7 +39,10 @@ interface ProfileData {
 
 interface ReferrerData {
   id: string;
-  company: string;
+  company: string | null;
+  companies: string[];
+  role: string | null;
+  roles: string[];
   telegramContact: string | null;
   linkedinUrl: string | null;
 }
@@ -67,7 +70,8 @@ type FormState = {
 };
 
 type ReferrerFormState = {
-  company: string;
+  companies: string[];
+  roles: string[];
   telegramContact: string;
   linkedinUrl: string;
 };
@@ -98,6 +102,27 @@ function humanFileSize(value: number | null): string {
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function normalizeReferrerData(referrer: ReferrerData): ReferrerData {
+  const companies = referrer.companies?.length
+    ? referrer.companies
+    : referrer.company
+      ? [referrer.company]
+      : [];
+  const roles = referrer.roles?.length
+    ? referrer.roles
+    : referrer.role
+      ? [referrer.role]
+      : [];
+
+  return {
+    ...referrer,
+    companies,
+    company: companies[0] ?? referrer.company ?? null,
+    roles,
+    role: roles[0] ?? referrer.role ?? null,
+  };
 }
 
 function FieldLabel({
@@ -155,11 +180,13 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
     isPublic: false,
   });
   const [referrerForm, setReferrerForm] = useState<ReferrerFormState>({
-    company: "",
+    companies: [],
+    roles: [],
     telegramContact: "",
     linkedinUrl: "",
   });
   const [customRole, setCustomRole] = useState("");
+  const [customReferrerRole, setCustomReferrerRole] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [lastSubmittedStatus, setLastSubmittedStatus] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -182,7 +209,8 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
 
         const referrerJson = await referrerRes.json();
         if (!referrerRes.ok) throw new Error(referrerJson.error ?? "Ошибка загрузки данных реферала");
-        const loadedReferrer = (referrerJson.referrer ?? null) as ReferrerData | null;
+        const rawReferrer = (referrerJson.referrer ?? null) as ReferrerData | null;
+        const loadedReferrer = rawReferrer ? normalizeReferrerData(rawReferrer) : null;
 
         if (loadedProfile) {
           setProfile(loadedProfile);
@@ -215,7 +243,8 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
         if (loadedReferrer) {
           setReferrer(loadedReferrer);
           setReferrerForm({
-            company: loadedReferrer.company ?? "",
+            companies: loadedReferrer.companies ?? [],
+            roles: loadedReferrer.roles ?? [],
             telegramContact: loadedReferrer.telegramContact ?? "",
             linkedinUrl: loadedReferrer.linkedinUrl ?? "",
           });
@@ -271,6 +300,33 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
     setForm((prev) => ({ ...prev, roles: prev.roles.filter((item) => item !== role) }));
   };
 
+  const toggleReferrerRole = (role: string) => {
+    setReferrerForm((prev) => {
+      if (prev.roles.includes(role)) {
+        return { ...prev, roles: prev.roles.filter((item) => item !== role) };
+      }
+      return { ...prev, roles: [...prev.roles, role] };
+    });
+  };
+
+  const addCustomReferrerRole = () => {
+    const trimmed = customReferrerRole.trim();
+    if (!trimmed) return;
+
+    setReferrerForm((prev) => {
+      if (prev.roles.some((role) => role.toLowerCase() === trimmed.toLowerCase())) return prev;
+      return { ...prev, roles: [...prev.roles, trimmed] };
+    });
+    setCustomReferrerRole("");
+  };
+
+  const removeReferrerRole = (role: string) => {
+    setReferrerForm((prev) => ({
+      ...prev,
+      roles: prev.roles.filter((item) => item !== role),
+    }));
+  };
+
   const collectPayload = () => ({
     roles: form.roles,
     companies: form.companies,
@@ -293,7 +349,12 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
 
   const validateForm = (): string | null => {
     if (userKind === "referrer") {
-      if (!referrerForm.company.trim()) return "Укажи компанию, в которой ты можешь реферить.";
+      if (!referrerForm.companies.length) {
+        return "Укажи хотя бы одну компанию, в которую ты можешь порефералить.";
+      }
+      if (!referrerForm.roles.length) {
+        return "Укажи, кем ты работаешь или по каким ролям можешь помочь.";
+      }
       return null;
     }
 
@@ -360,7 +421,10 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            company: referrerForm.company,
+            company: referrerForm.companies[0] ?? null,
+            companies: referrerForm.companies,
+            role: referrerForm.roles[0] ?? null,
+            roles: referrerForm.roles,
             telegramContact: referrerForm.telegramContact || null,
             linkedinUrl: referrerForm.linkedinUrl || null,
           }),
@@ -372,10 +436,11 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
           return;
         }
 
-        const savedReferrer = json.referrer as ReferrerData;
+        const savedReferrer = normalizeReferrerData(json.referrer as ReferrerData);
         setReferrer(savedReferrer);
         setReferrerForm({
-          company: savedReferrer.company ?? "",
+          companies: savedReferrer.companies ?? [],
+          roles: savedReferrer.roles ?? [],
           telegramContact: savedReferrer.telegramContact ?? "",
           linkedinUrl: savedReferrer.linkedinUrl ?? "",
         });
@@ -445,7 +510,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
           <p className="text-sm text-[#4A5568]">
             {userKind === "candidate"
               ? "После нажатия кнопки внизу мы сохраним профиль и отправим заявку владельцу сервиса."
-              : "Выбери компанию и оставь контакты, чтобы получать обращения от кандидатов."}
+              : "Укажи компании, роли и контакты, чтобы получать релевантные обращения от кандидатов."}
           </p>
           {userKind === "candidate" && lastSubmittedStatus && (
             <p className="text-sm text-green-700 mt-2">{lastSubmittedStatus}</p>
@@ -815,20 +880,79 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
           <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
             <h3 className="text-base font-bold text-[#171923] mb-2">Данные реферала</h3>
             <p className="text-sm text-[#4A5568] mb-4">
-              Укажи компанию и контакты. Этого достаточно, чтобы активировать профиль реферала.
+              Укажи компании, в которые можешь порефералить: где работаешь сейчас, работал раньше или где есть сильные знакомые. Добавь, кем ты работаешь, чтобы кандидаты понимали, по каким направлениям ты можешь помочь.
             </p>
 
             <div className="mb-4">
-              <FieldLabel required>Компания</FieldLabel>
+              <FieldLabel required>Компании, в которые можешь порефералить</FieldLabel>
               <CompanyPicker
                 options={COMPANY_OPTIONS}
-                values={referrerForm.company ? [referrerForm.company] : []}
+                values={referrerForm.companies}
                 onChange={(values) =>
-                  setReferrerForm((prev) => ({ ...prev, company: values[0] ?? "" }))
+                  setReferrerForm((prev) => ({ ...prev, companies: values }))
                 }
-                multiple={false}
-                placeholder="Поиск компании или добавление своей"
+                multiple
+                placeholder="Например: Яндекс, VK, любая своя компания"
               />
+              <p className="mt-2 text-xs text-[#718096]">
+                Можно выбрать несколько компаний и добавить свою вручную.
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <FieldLabel required>Кем ты работаешь</FieldLabel>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {ROLES.map((role) => {
+                  const active = referrerForm.roles.includes(role);
+                  return (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => toggleReferrerRole(role)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                        active ? "bg-[#1863e5] text-white" : "bg-[#F7FAFC] text-[#4A5568] hover:bg-[#EBF4FF]"
+                      }`}
+                    >
+                      {role}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customReferrerRole}
+                  onChange={(event) => setCustomReferrerRole(event.target.value)}
+                  placeholder="Своя роль: маркетолог, дизайнер, sales..."
+                  className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+                />
+                <button
+                  type="button"
+                  onClick={addCustomReferrerRole}
+                  className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-[#171923] hover:bg-gray-50 transition-colors"
+                >
+                  Добавить
+                </button>
+              </div>
+              {referrerForm.roles.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {referrerForm.roles.map((role) => (
+                    <span
+                      key={role}
+                      className="inline-flex items-center gap-2 rounded-full bg-[#EBF4FF] px-3 py-1 text-xs font-medium text-[#1863e5]"
+                    >
+                      {role}
+                      <button
+                        type="button"
+                        onClick={() => removeReferrerRole(role)}
+                        className="text-[#1550c0] hover:text-[#0f3d92]"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
@@ -860,7 +984,8 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
 
             {referrer && (
               <p className="mt-3 text-xs text-[#718096]">
-                Текущий профиль реферала: {referrer.company}
+                Текущий профиль реферала: {referrer.companies.join(", ")}
+                {referrer.roles.length ? ` · ${referrer.roles.join(", ")}` : ""}
               </p>
             )}
           </div>

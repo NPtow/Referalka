@@ -18,11 +18,31 @@ export async function GET() {
     where: { userId, status: "REFERRER_FOUND" },
   });
 
+  const referrerCompanies = user.referrer
+    ? user.referrer.companies.length
+      ? user.referrer.companies
+      : [user.referrer.company]
+    : [];
+  const referrerRoles = user.referrer
+    ? user.referrer.roles.length
+      ? user.referrer.roles
+      : user.referrer.role
+        ? [user.referrer.role]
+        : []
+    : [];
+
   // Calculate profile completeness
   const profile = user.profile;
-  const profileComplete = profile
+  const candidateProfileComplete = profile
     ? [!!profile.role, !!profile.companies?.length, !!profile.resumeUrl, !!profile.experience, !!profile.bio].filter(Boolean).length >= 4
     : false;
+  const candidateProfileProgress = profile
+    ? Math.round(([!!profile.role, !!profile.companies?.length, !!profile.resumeUrl, !!profile.experience, !!profile.bio].filter(Boolean).length / 5) * 100)
+    : 0;
+  const referrerProfileProgress = Math.round(([referrerCompanies.length > 0, referrerRoles.length > 0, !!user.referrer?.telegramContact, !!user.referrer?.linkedinUrl].filter(Boolean).length / 4) * 100);
+  const profileComplete = user.referrer
+    ? referrerCompanies.length > 0 && referrerRoles.length > 0
+    : candidateProfileComplete;
 
   return NextResponse.json({
     user: {
@@ -32,11 +52,9 @@ export async function GET() {
       photoUrl: user.photoUrl,
     },
     role: user.referrer ? "REFERRER" : "CANDIDATE",
-    referrerCompany: user.referrer?.company ?? null,
+    referrerCompany: referrerCompanies.length ? referrerCompanies.join(", ") : null,
     profileComplete,
-    profileProgress: profile
-      ? Math.round(([!!profile.role, !!profile.companies?.length, !!profile.resumeUrl, !!profile.experience, !!profile.bio].filter(Boolean).length / 5) * 100)
-      : 0,
+    profileProgress: user.referrer ? referrerProfileProgress : candidateProfileProgress,
     activeRequests,
     hasReferrerFound: !!referrerFoundRequest,
     referrerFoundRequest,

@@ -119,6 +119,9 @@ model Referrer {
   id          String   @id @default(cuid())
   userId      Int      @unique
   company     String
+  companies   String[] @default([])
+  role        String?
+  roles       String[] @default([])
   telegramContact String?
   linkedinUrl String?
   createdAt   DateTime @default(now())
