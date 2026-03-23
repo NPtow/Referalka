@@ -271,6 +271,15 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
   const displayUsername = profile?.user.username || sessionUser.email || null;
   const displayPhoto = profile?.user.photoUrl || sessionUser.image || null;
   const hasAnyResume = Boolean(form.resumeFileUrl || form.resumeUrl.trim() || form.resumeText.trim());
+  const candidateProfileCompleted = Boolean(profile?.applicationSubmittedAt || lastSubmittedStatus);
+  const referrerProfileCompleted = Boolean(
+    referrer
+    && referrer.companies.length > 0
+    && referrer.roles.length > 0,
+  );
+  const shouldShowProfileBanner = userKind === "candidate"
+    ? !candidateProfileCompleted
+    : !referrerProfileCompleted;
 
   const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -501,21 +510,20 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
       <div className="h-16" />
 
       <div className="max-w-3xl mx-auto px-4 py-12">
-        <div className="bg-[#EBF4FF] border border-[#C3DAFE] rounded-2xl p-5 mb-6">
-          <h1 className="text-lg font-black text-[#171923] mb-1" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
-            {userKind === "candidate"
-              ? "Заполни профиль, чтобы подать заявку на реферал"
-              : "Заполни профиль реферала"}
-          </h1>
-          <p className="text-sm text-[#4A5568]">
-            {userKind === "candidate"
-              ? "После нажатия кнопки внизу мы сохраним профиль и отправим заявку владельцу сервиса."
-              : "Укажи компании, роли и контакты, чтобы получать релевантные обращения от кандидатов."}
-          </p>
-          {userKind === "candidate" && lastSubmittedStatus && (
-            <p className="text-sm text-green-700 mt-2">{lastSubmittedStatus}</p>
-          )}
-        </div>
+        {shouldShowProfileBanner && (
+          <div className="bg-[#EBF4FF] border border-[#C3DAFE] rounded-2xl p-5 mb-6">
+            <h1 className="text-lg font-black text-[#171923] mb-1" style={{ fontFamily: "'Inter Tight', sans-serif" }}>
+              {userKind === "candidate"
+                ? "Заполни профиль, чтобы подать заявку на реферал"
+                : "Заполни профиль реферала"}
+            </h1>
+            <p className="text-sm text-[#4A5568]">
+              {userKind === "candidate"
+                ? "После нажатия кнопки внизу мы сохраним профиль и отправим заявку владельцу сервиса."
+                : "Укажи компании, роли и контакты, чтобы получать релевантные обращения от кандидатов."}
+            </p>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
