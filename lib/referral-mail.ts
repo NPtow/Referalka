@@ -3,6 +3,10 @@ import { getAppBaseUrl } from "@/lib/app-url";
 
 type SendResult = { ok: true } | { ok: false; error: string };
 
+function isMockEmailTransportEnabled(): boolean {
+  return process.env.EMAIL_TRANSPORT_MODE === "mock";
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -25,11 +29,24 @@ function isEmail(value: string | null | undefined): value is string {
   return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
 }
 
+function getReferralAdminEmail(): string | null {
+  const value = process.env.REFERRAL_ADMIN_EMAIL || process.env.APPLICATION_TO_EMAIL || null;
+  return isEmail(value) ? value : null;
+}
+
+function getReferralPaymentContact(): string {
+  return process.env.REFERRAL_PAYMENT_CONTACT || getReferralAdminEmail() || "напишите администратору сервиса";
+}
+
 async function sendEmail(params: {
   to: string;
   subject: string;
   html: string;
 }): Promise<SendResult> {
+  if (isMockEmailTransportEnabled()) {
+    return { ok: true };
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
 
@@ -110,6 +127,96 @@ export async function sendMatchingCandidateEmailToReferrer(params: {
   });
 }
 
+export async function sendReferralMatchPendingEmails(params: {
+  approvalToken: string;
+  companyName: string;
+  candidate: {
+    name: string;
+    email: string;
+    telegramContact: string | null;
+    linkedinUrl: string | null;
+    githubUrl: string | null;
+    siteUrl: string | null;
+    experience: number;
+    roles: string[];
+    companies: string[];
+    bio: string | null;
+    resumeUrl: string | null;
+    resumeFileUrl: string | null;
+  };
+  referrer: {
+    name: string;
+    email: string;
+    telegramContact: string | null;
+    linkedinUrl: string | null;
+    roles: string[];
+    companies: string[];
+  };
+}): Promise<SendResult> {
+  if (!isEmail(params.candidate.email)) {
+    return { ok: false, error: "У кандидата нет корректного email." };
+  }
+
+  const adminEmail = getReferralAdminEmail();
+  if (!adminEmail) {
+    return { ok: false, error: "REFERRAL_ADMIN_EMAIL или APPLICATION_TO_EMAIL не настроен." };
+  }
+
+  const paymentContact = getReferralPaymentContact();
+  const approveUrl = `${getAppBaseUrl()}/admin/referral-connections/approve?token=${encodeURIComponent(params.approvalToken)}`;
+
+  const candidateHtml = `
+    <h2>Мы нашли тебе подходящего рефера</h2>
+    <p>Появился мэтч по компании <b>${formatText(params.companyName)}</b>.</p>
+    <p>Рефер уже подтвердил готовность помочь, но контакты мы откроем только после ручного апрува.</p>
+    <hr />
+    <p><b>Рефер:</b> ${formatText(params.referrer.name)}</p>
+    <p><b>Направления:</b> ${formatText(params.referrer.roles.join(", "))}</p>
+    <p><b>Компании:</b> ${formatText(params.referrer.companies.join(", "))}</p>
+    <p><b>Как оплатить:</b> свяжись по ${formatText(paymentContact)} и подтвердим оплату вручную.</p>
+    <p><b>Если нужен человек:</b> ${formatText(adminEmail)}</p>
+    <p>После подтверждения оплаты мы пришлём контакты обеим сторонам отдельным письмом.</p>
+  `;
+
+  const adminHtml = `
+    <h2>Новый мэтч ожидает оплату</h2>
+    <p>Рефер откликнулся на кандидата по компании <b>${formatText(params.companyName)}</b>.</p>
+    <hr />
+    <p><b>Кандидат:</b> ${formatText(params.candidate.name)}</p>
+    <p><b>Email кандидата:</b> ${formatText(params.candidate.email)}</p>
+    <p><b>Telegram кандидата:</b> ${formatText(params.candidate.telegramContact)}</p>
+    <p><b>Роли кандидата:</b> ${formatText(params.candidate.roles.join(", "))}</p>
+    <p><b>Опыт:</b> ${params.candidate.experience} лет</p>
+    <p><b>Компании кандидата:</b> ${formatText(params.candidate.companies.join(", "))}</p>
+    <p><b>Резюме кандидата:</b> ${params.candidate.resumeFileUrl ? link("Файл", params.candidate.resumeFileUrl) : params.candidate.resumeUrl ? link("Ссылка", params.candidate.resumeUrl) : "—"}</p>
+    <hr />
+    <p><b>Рефер:</b> ${formatText(params.referrer.name)}</p>
+    <p><b>Email рефера:</b> ${formatText(params.referrer.email)}</p>
+    <p><b>Telegram рефера:</b> ${formatText(params.referrer.telegramContact)}</p>
+    <p><b>LinkedIn рефера:</b> ${params.referrer.linkedinUrl ? link(params.referrer.linkedinUrl, params.referrer.linkedinUrl) : "—"}</p>
+    <p><b>Направления рефера:</b> ${formatText(params.referrer.roles.join(", "))}</p>
+    <p><b>Компании рефера:</b> ${formatText(params.referrer.companies.join(", "))}</p>
+    <p><a href="${escapeHtml(approveUrl)}" target="_blank" rel="noreferrer">Открыть страницу апрува</a></p>
+  `;
+
+  const [candidateResult, adminResult] = await Promise.all([
+    sendEmail({
+      to: params.candidate.email,
+      subject: `Нашли мэтч по ${params.companyName} — нужен ручной апрув`,
+      html: candidateHtml,
+    }),
+    sendEmail({
+      to: adminEmail,
+      subject: `Новый мэтч ожидает оплату — ${params.companyName}`,
+      html: adminHtml,
+    }),
+  ]);
+
+  if (!candidateResult.ok) return candidateResult;
+  if (!adminResult.ok) return adminResult;
+  return { ok: true };
+}
+
 export async function sendReferralIntroEmails(params: {
   companyName: string;
   candidate: {
@@ -146,8 +253,8 @@ export async function sendReferralIntroEmails(params: {
   const dashboardUrl = `${getAppBaseUrl()}/referrer/candidates`;
 
   const candidateHtml = `
-    <h2>Мы нашли тебе рефера</h2>
-    <p>Тебя готовы порефералить в <b>${formatText(params.companyName)}</b>.</p>
+    <h2>Оплата подтверждена, отправляем контакты</h2>
+    <p>Апрув по компании <b>${formatText(params.companyName)}</b> подтверждён. Ниже контакты твоего рефера.</p>
     <hr />
     <p><b>Рефер:</b> ${formatText(params.referrer.name)}</p>
     <p><b>Email:</b> ${formatText(params.referrer.email)}</p>
@@ -159,8 +266,8 @@ export async function sendReferralIntroEmails(params: {
   `;
 
   const referrerHtml = `
-    <h2>Кандидат ждёт твоего интро</h2>
-    <p>Ты откликнулся на кандидата по компании <b>${formatText(params.companyName)}</b>.</p>
+    <h2>Апрув подтверждён, можно знакомить кандидата</h2>
+    <p>Оплата по компании <b>${formatText(params.companyName)}</b> подтверждена. Ниже контакты кандидата.</p>
     <hr />
     <p><b>Кандидат:</b> ${formatText(params.candidate.name)}</p>
     <p><b>Email:</b> ${formatText(params.candidate.email)}</p>

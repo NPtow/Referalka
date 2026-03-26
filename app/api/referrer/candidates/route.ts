@@ -33,35 +33,45 @@ export async function GET() {
   });
 
   const candidateIds = candidates.map((candidate) => candidate.userId);
-  const sentConnections = candidateIds.length
+  const existingConnections = candidateIds.length
     ? await prisma.referralConnection.findMany({
       where: {
         referrerUserId: user.id,
         candidateUserId: { in: candidateIds },
-        introEmailSentAt: { not: null },
       },
       select: {
         candidateUserId: true,
         companyName: true,
+        status: true,
       },
     })
     : [];
 
-  const sentCompaniesByCandidate = new Map<number, string[]>();
-  for (const connection of sentConnections) {
-    const list = sentCompaniesByCandidate.get(connection.candidateUserId) ?? [];
-    list.push(connection.companyName);
-    sentCompaniesByCandidate.set(connection.candidateUserId, list);
+  const connectionsByCandidate = new Map<number, { companyName: string; status: string }[]>();
+  for (const connection of existingConnections) {
+    const list = connectionsByCandidate.get(connection.candidateUserId) ?? [];
+    list.push(connection);
+    connectionsByCandidate.set(connection.candidateUserId, list);
   }
 
   const matchedCandidates = candidates
     .map((candidate) => {
       const sharedCompanies = intersectByNormalizedValue(candidate.companies, referrerCompanies);
-      const connectedCompanies = (sentCompaniesByCandidate.get(candidate.userId) ?? []).filter((companyName) =>
-        sharedCompanies.some((item) => normalizeMatchingValue(item) === normalizeMatchingValue(companyName))
-      );
+      const candidateConnections = connectionsByCandidate.get(candidate.userId) ?? [];
+      const pendingCompanies = candidateConnections
+        .filter((connection) =>
+          connection.status === "PENDING_PAYMENT"
+          && sharedCompanies.some((item) => normalizeMatchingValue(item) === normalizeMatchingValue(connection.companyName))
+        )
+        .map((connection) => connection.companyName);
+      const connectedCompanies = candidateConnections
+        .filter((connection) =>
+          connection.status === "APPROVED"
+          && sharedCompanies.some((item) => normalizeMatchingValue(item) === normalizeMatchingValue(connection.companyName))
+        )
+        .map((connection) => connection.companyName);
       const availableCompanies = sharedCompanies.filter((companyName) =>
-        !connectedCompanies.some((item) => normalizeMatchingValue(item) === normalizeMatchingValue(companyName))
+        ![...pendingCompanies, ...connectedCompanies].some((item) => normalizeMatchingValue(item) === normalizeMatchingValue(companyName))
       );
 
       return {
@@ -72,6 +82,7 @@ export async function GET() {
         companies: candidate.companies,
         sharedCompanies,
         availableCompanies,
+        pendingCompanies,
         connectedCompanies,
         location: candidate.location,
         openToRelocation: candidate.openToRelocation,

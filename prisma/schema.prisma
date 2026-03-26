@@ -170,6 +170,10 @@ model ReferralConnection {
   referrerUserId   Int
   referrerId       String
   companyName      String
+  status           String   @default("PENDING_PAYMENT")
+  adminApprovalToken String @unique
+  paymentRequestEmailSentAt DateTime?
+  adminApprovedAt  DateTime?
   introEmailSentAt DateTime?
   createdAt        DateTime @default(now())
   candidateUser    User     @relation("CandidateConnections", fields: [candidateUserId], references: [id], onDelete: Cascade)

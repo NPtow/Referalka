@@ -14,6 +14,7 @@ type Candidate = {
   companies: string[];
   sharedCompanies: string[];
   availableCompanies: string[];
+  pendingCompanies: string[];
   connectedCompanies: string[];
   location: string | null;
   openToRelocation: boolean;
@@ -94,19 +95,40 @@ export default function ReferrerCandidatesPage() {
         return;
       }
 
+      const status = typeof json.status === "string" ? json.status : "PENDING_PAYMENT";
+      const alreadyExists = Boolean(json.alreadyExists);
+
       setCandidates((prev) =>
         prev.map((candidate) => {
           if (candidate.id !== candidateId) return candidate;
-          if (candidate.connectedCompanies.includes(companyName)) return candidate;
+          if (
+            candidate.connectedCompanies.includes(companyName)
+            || candidate.pendingCompanies.includes(companyName)
+          ) {
+            return candidate;
+          }
 
           return {
             ...candidate,
             availableCompanies: candidate.availableCompanies.filter((item) => item !== companyName),
-            connectedCompanies: [...candidate.connectedCompanies, companyName],
+            pendingCompanies: status === "PENDING_PAYMENT"
+              ? [...candidate.pendingCompanies, companyName]
+              : candidate.pendingCompanies,
+            connectedCompanies: status === "APPROVED"
+              ? [...candidate.connectedCompanies, companyName]
+              : candidate.connectedCompanies,
           };
         }),
       );
-      setToastMessage(`Отправили intro по ${companyName}. Дальше ребята смогут списаться напрямую.`);
+      if (alreadyExists) {
+        setToastMessage(
+          status === "APPROVED"
+            ? `По ${companyName} контакты уже были отправлены раньше.`
+            : `По ${companyName} мэтч уже создан и ждёт оплату с ручным апрувом.`,
+        );
+      } else {
+        setToastMessage(`Создали мэтч по ${companyName}. Кандидату ушли инструкции по оплате, а админу — письмо на апрув.`);
+      }
     } catch {
       setError("Ошибка сети при отправке intro.");
     } finally {
@@ -140,7 +162,7 @@ export default function ReferrerCandidatesPage() {
           </h1>
           <p className="max-w-3xl text-sm text-[#4A5568]">
             Здесь кандидаты с уже отправленной анкетой, которые совпадают с твоими компаниями.
-            Контакты на странице не раскрываем: нажимаешь кнопку, и мы отправляем intro email обеим сторонам.
+            Контакты на странице не раскрываем: после клика кандидат получает инструкции по оплате, а контакты уходят только после ручного апрува.
           </p>
         </div>
 
@@ -290,12 +312,17 @@ export default function ReferrerCandidatesPage() {
                       })}
                     </div>
                   ) : (
-                    <p className="text-sm text-[#718096]">По всем совпадающим компаниям intro уже отправили.</p>
+                    <p className="text-sm text-[#718096]">По всем совпадающим компаниям мэтч уже создан.</p>
                   )}
 
+                  {candidate.pendingCompanies.length > 0 && (
+                    <p className="mt-3 text-xs text-amber-700">
+                      Ждём оплату и ручной апрув: {candidate.pendingCompanies.join(", ")}
+                    </p>
+                  )}
                   {candidate.connectedCompanies.length > 0 && (
                     <p className="mt-3 text-xs text-emerald-700">
-                      Уже отправили intro: {candidate.connectedCompanies.join(", ")}
+                      Контакты уже отправили: {candidate.connectedCompanies.join(", ")}
                     </p>
                   )}
                 </div>

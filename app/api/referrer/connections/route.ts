@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { resolveCurrentAppUser } from "@/lib/resolve-current-app-user";
@@ -9,7 +10,7 @@ import {
   resolveCompanyList,
   resolveRoleList,
 } from "@/lib/referral-matching";
-import { sendReferralIntroEmails } from "@/lib/referral-mail";
+import { sendReferralMatchPendingEmails } from "@/lib/referral-mail";
 
 function normalizeCompanyName(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
           referrerUserId: user.id,
           referrerId: user.referrer.id,
           companyName: matchedCompany,
+          adminApprovalToken: randomUUID(),
         },
       });
     } catch (error) {
@@ -106,10 +108,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "У одной из сторон не найден email для интро." }, { status: 400 });
   }
 
-  const alreadySent = Boolean(connection.introEmailSentAt);
+  const alreadyExists = Boolean(
+    connection.paymentRequestEmailSentAt
+    || connection.introEmailSentAt
+    || connection.status === "APPROVED"
+  );
 
-  if (!alreadySent) {
-    const sendResult = await sendReferralIntroEmails({
+  if (connection.status === "PENDING_PAYMENT" && !connection.paymentRequestEmailSentAt) {
+    const sendResult = await sendReferralMatchPendingEmails({
+      approvalToken: connection.adminApprovalToken,
       companyName: matchedCompany,
       candidate: {
         name: candidate.user.firstName,
@@ -141,13 +148,14 @@ export async function POST(req: NextRequest) {
 
     connection = await prisma.referralConnection.update({
       where: { id: connection.id },
-      data: { introEmailSentAt: new Date() },
+      data: { paymentRequestEmailSentAt: new Date() },
     });
   }
 
   return NextResponse.json({
     ok: true,
     connection,
-    alreadySent,
+    status: connection.status,
+    alreadyExists,
   });
 }
