@@ -892,20 +892,6 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
                   />
                   <span className="text-sm text-[#4A5568]">Показывать профиль в базе рефереров</span>
                 </label>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.shareWithMatchingReferrers}
-                    onChange={(event) => updateForm("shareWithMatchingReferrers", event.target.checked)}
-                    className="w-4 h-4 mt-0.5"
-                  />
-                  <span className="text-sm text-[#4A5568]">
-                    Показывать мой профиль подходящим реферам и разрешить intro по почте
-                    <span className="mt-1 block text-xs text-[#718096]">
-                      После отправки заявки мы будем показывать тебя только тем реферам, у которых есть совпадение по компаниям.
-                    </span>
-                  </span>
-                </label>
               </div>
             </div>
           </>

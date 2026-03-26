@@ -11,6 +11,17 @@ import { sendMatchingCandidateEmailToReferrer } from "@/lib/referral-mail";
 import { getAppBaseUrl } from "@/lib/app-url";
 import { intersectByNormalizedValue, resolveCompanyList, resolveRoleList } from "@/lib/referral-matching";
 
+function sameCompanySet(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+
+  const leftSet = new Set(left.map((item) => item.trim().toLowerCase()));
+  for (const item of right) {
+    if (!leftSet.has(item.trim().toLowerCase())) return false;
+  }
+
+  return true;
+}
+
 export async function POST(req: NextRequest) {
   const appUser = await resolveCurrentAppUser();
   if (!appUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,7 +36,7 @@ export async function POST(req: NextRequest) {
     where: { userId: appUser.id },
     select: {
       applicationSubmittedAt: true,
-      shareWithMatchingReferrers: true,
+      companies: true,
     },
   });
 
@@ -72,8 +83,8 @@ export async function POST(req: NextRequest) {
   });
 
   let referrerNotificationsSent = 0;
-  const shouldNotifyReferrers = payload.shareWithMatchingReferrers
-    && (!existingProfile?.applicationSubmittedAt || !existingProfile.shareWithMatchingReferrers);
+  const shouldNotifyReferrers = !existingProfile?.applicationSubmittedAt
+    || !sameCompanySet(existingProfile.companies, payload.companies);
 
   if (shouldNotifyReferrers) {
     const poolUrl = `${getAppBaseUrl()}/referrer/candidates`;

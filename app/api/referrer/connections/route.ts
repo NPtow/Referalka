@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  if (!candidate || !candidate.applicationSubmittedAt || !candidate.shareWithMatchingReferrers) {
+  if (!candidate || !candidate.applicationSubmittedAt) {
     return NextResponse.json({ error: "Кандидат больше не доступен для соединения." }, { status: 404 });
   }
 

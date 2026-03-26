@@ -24,7 +24,6 @@ export async function GET() {
     where: {
       userId: { not: user.id },
       applicationSubmittedAt: { not: null },
-      shareWithMatchingReferrers: true,
       companies: { hasSome: referrerCompanies },
     },
     include: {
