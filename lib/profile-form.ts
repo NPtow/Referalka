@@ -18,6 +18,7 @@ export type ProfileFormPayload = {
   bio: string | null;
   openToRelocation: boolean;
   isPublic: boolean;
+  shareWithMatchingReferrers: boolean;
 };
 
 function normalizeString(value: unknown): string | null {
@@ -72,6 +73,7 @@ export function normalizeProfilePayload(raw: unknown): ProfileFormPayload {
     bio: normalizeString(body.bio),
     openToRelocation: Boolean(body.openToRelocation),
     isPublic: Boolean(body.isPublic),
+    shareWithMatchingReferrers: Boolean(body.shareWithMatchingReferrers),
   };
 }
 
@@ -109,6 +111,7 @@ export function payloadToProfileCreateUpdate(payload: ProfileFormPayload) {
     bio: payload.bio,
     openToRelocation: payload.openToRelocation,
     isPublic: payload.isPublic,
+    shareWithMatchingReferrers: payload.shareWithMatchingReferrers,
     summary: buildProfileSummary(payload),
   };
 }
@@ -132,6 +135,7 @@ export function profileToPayload(profile: Pick<Profile,
   | "bio"
   | "openToRelocation"
   | "isPublic"
+  | "shareWithMatchingReferrers"
 >): ProfileFormPayload {
   return {
     roles: profile.roles?.length ? profile.roles : [profile.role],
@@ -151,6 +155,7 @@ export function profileToPayload(profile: Pick<Profile,
     bio: profile.bio,
     openToRelocation: profile.openToRelocation,
     isPublic: profile.isPublic,
+    shareWithMatchingReferrers: profile.shareWithMatchingReferrers,
   };
 }
 

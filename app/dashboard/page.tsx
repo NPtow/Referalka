@@ -196,13 +196,13 @@ export default function DashboardPage() {
                   <p className="text-sm text-[#718096] mb-1">Компания: {data.referrerCompany}</p>
                 )}
                 <p className="text-sm text-[#718096] mb-4">
-                  Когда найдём подходящего кандидата — напишем в Telegram
+                  Открой пул подходящих кандидатов и отправь intro по почте прямо через сайт.
                 </p>
                 <Link
-                  href="/profile"
-                  className="inline-flex items-center gap-2 border border-gray-200 text-[#171923] font-semibold px-5 py-2.5 rounded-xl hover:bg-[#F7FAFC] transition-colors text-sm"
+                  href="/referrer/candidates"
+                  className="inline-flex items-center gap-2 bg-[#1863e5] text-white font-semibold px-5 py-2.5 rounded-xl hover:bg-[#1550c0] transition-colors text-sm"
                 >
-                  Обновить профиль
+                  Посмотреть кандидатов →
                 </Link>
               </div>
             </div>

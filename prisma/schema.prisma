@@ -17,6 +17,8 @@ model User {
   profile          Profile?
   referrer         Referrer?
   referralRequests ReferralRequest[]
+  receivedReferralConnections ReferralConnection[] @relation("CandidateConnections")
+  initiatedReferralConnections ReferralConnection[] @relation("ReferrerConnections")
 }
 
 model AuthUser {
@@ -95,6 +97,7 @@ model Profile {
   referrals        Int      @default(0)
   bio              String?
   isPublic         Boolean  @default(false)
+  shareWithMatchingReferrers Boolean @default(false)
   openToRelocation Boolean  @default(false)
   location         String?
   resumeText       String?
@@ -104,6 +107,7 @@ model Profile {
   updatedAt        DateTime @updatedAt
   user             User     @relation(fields: [userId], references: [id])
   views            ProfileView[]
+  referralConnections ReferralConnection[]
 }
 
 model ProfileView {
@@ -126,6 +130,7 @@ model Referrer {
   linkedinUrl String?
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id])
+  referralConnections ReferralConnection[]
 }
 
 model Vacancy {
@@ -156,4 +161,23 @@ model ReferralRequest {
   user             User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
+}
+
+model ReferralConnection {
+  id               String   @id @default(cuid())
+  candidateUserId  Int
+  candidateProfileId String
+  referrerUserId   Int
+  referrerId       String
+  companyName      String
+  introEmailSentAt DateTime?
+  createdAt        DateTime @default(now())
+  candidateUser    User     @relation("CandidateConnections", fields: [candidateUserId], references: [id], onDelete: Cascade)
+  candidateProfile Profile  @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  referrerUser     User     @relation("ReferrerConnections", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referrer         Referrer @relation(fields: [referrerId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateUserId, referrerUserId, companyName])
+  @@index([candidateUserId, createdAt])
+  @@index([referrerUserId, createdAt])
 }

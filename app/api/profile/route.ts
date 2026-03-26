@@ -57,6 +57,15 @@ export async function DELETE() {
   if (!session?.user?.id || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const profile = await prisma.profile.findUnique({ where: { userId: user.id } });
+  await prisma.referralConnection.deleteMany({
+    where: {
+      OR: [
+        { candidateUserId: user.id },
+        { referrerUserId: user.id },
+      ],
+    },
+  });
+
   if (profile) {
     await prisma.profileView.deleteMany({ where: { profileId: profile.id } });
     await prisma.profile.delete({ where: { userId: user.id } });
@@ -96,6 +105,7 @@ export async function PATCH(req: NextRequest) {
       location: true,
       openToRelocation: true,
       isPublic: true,
+      shareWithMatchingReferrers: true,
       resumeText: true,
     },
   });

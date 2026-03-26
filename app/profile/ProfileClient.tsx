@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { COMPANIES_META, ROLES } from "@/lib/constants";
 import { authClient } from "@/lib/auth-client";
@@ -25,6 +26,7 @@ interface ProfileData {
   siteUrl: string | null;
   bio: string | null;
   isPublic: boolean;
+  shareWithMatchingReferrers: boolean;
   openToRelocation: boolean;
   location: string | null;
   resumeText: string | null;
@@ -67,6 +69,7 @@ type FormState = {
   bio: string;
   openToRelocation: boolean;
   isPublic: boolean;
+  shareWithMatchingReferrers: boolean;
 };
 
 type ReferrerFormState = {
@@ -178,6 +181,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
     bio: "",
     openToRelocation: false,
     isPublic: false,
+    shareWithMatchingReferrers: false,
   });
   const [referrerForm, setReferrerForm] = useState<ReferrerFormState>({
     companies: [],
@@ -232,6 +236,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
             bio: loadedProfile.bio ?? "",
             openToRelocation: loadedProfile.openToRelocation ?? false,
             isPublic: loadedProfile.isPublic ?? false,
+            shareWithMatchingReferrers: loadedProfile.shareWithMatchingReferrers ?? false,
           });
           if (loadedProfile.applicationSubmittedAt) {
             setLastSubmittedStatus(
@@ -354,6 +359,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
     bio: form.bio || null,
     openToRelocation: form.openToRelocation,
     isPublic: form.isPublic,
+    shareWithMatchingReferrers: form.shareWithMatchingReferrers,
   });
 
   const validateForm = (): string | null => {
@@ -476,7 +482,12 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
       const submittedAt = json.submittedAt ?? json.profile?.applicationSubmittedAt ?? new Date().toISOString();
       if (json.profile) setProfile(json.profile as ProfileData);
       setLastSubmittedStatus(`Последняя заявка отправлена: ${formatDate(submittedAt)}`);
-      setToastMessage("Заявка подана");
+      const notifiedReferrers = Number(json.referrerNotificationsSent ?? 0);
+      setToastMessage(
+        notifiedReferrers > 0
+          ? `Заявка подана. Подходящим реферам отправили ${notifiedReferrers} ${notifiedReferrers === 1 ? "письмо" : "писем"}.`
+          : "Заявка подана",
+      );
     } catch {
       setError("Ошибка сети при отправке заявки.");
     } finally {
@@ -881,6 +892,20 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
                   />
                   <span className="text-sm text-[#4A5568]">Показывать профиль в базе рефереров</span>
                 </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.shareWithMatchingReferrers}
+                    onChange={(event) => updateForm("shareWithMatchingReferrers", event.target.checked)}
+                    className="w-4 h-4 mt-0.5"
+                  />
+                  <span className="text-sm text-[#4A5568]">
+                    Показывать мой профиль подходящим реферам и разрешить intro по почте
+                    <span className="mt-1 block text-xs text-[#718096]">
+                      После отправки заявки мы будем показывать тебя только тем реферам, у которых есть совпадение по компаниям.
+                    </span>
+                  </span>
+                </label>
               </div>
             </div>
           </>
@@ -1015,6 +1040,21 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
                 : "Сохранить профиль реферала"}
           </button>
         </div>
+
+        {userKind === "referrer" && referrerProfileCompleted && (
+          <div className="mt-4 rounded-2xl border border-[#C3DAFE] bg-[#EBF4FF] p-5">
+            <h3 className="text-base font-bold text-[#171923] mb-1">Профиль готов</h3>
+            <p className="text-sm text-[#4A5568] mb-4">
+              Теперь можно открыть пул кандидатов, которые совпадают с твоими компаниями, и отправить им intro прямо через сайт.
+            </p>
+            <Link
+              href="/referrer/candidates"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#1863e5] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1550c0]"
+            >
+              Посмотреть людей, которых ты можешь зарефералить →
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
