@@ -2,6 +2,10 @@ import type { ProfileFormPayload } from "@/lib/profile-form";
 
 type SendResult = { ok: true } | { ok: false; error: string };
 
+function isMockEmailTransportEnabled(): boolean {
+  return process.env.EMAIL_TRANSPORT_MODE === "mock";
+}
+
 function maskLongText(value: string | null, max = 2500): string {
   if (!value) return "";
   if (value.length <= max) return value;
@@ -20,12 +24,31 @@ function formatHtml(text: string | null): string {
   return escapeHtml(text).replaceAll("\n", "<br/>");
 }
 
+function renderVacancyLinks(payload: ProfileFormPayload): string {
+  const items = payload.companies
+    .map((company) => {
+      const url = payload.vacancyLinks[company];
+      if (!url) return null;
+
+      const safeUrl = escapeHtml(url);
+      return `<li><b>${escapeHtml(company)}:</b> <a href="${safeUrl}" target="_blank" rel="noreferrer">${safeUrl}</a></li>`;
+    })
+    .filter(Boolean);
+
+  if (!items.length) return "—";
+  return `<ul>${items.join("")}</ul>`;
+}
+
 export async function sendApplicationEmail(params: {
   candidateName: string;
   candidateEmail: string | null;
   payload: ProfileFormPayload;
   submittedAt: Date;
 }): Promise<SendResult> {
+  if (isMockEmailTransportEnabled()) {
+    return { ok: true };
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   const to = process.env.APPLICATION_TO_EMAIL || "pusser.nikitaa@gmail.com";
@@ -45,6 +68,7 @@ export async function sendApplicationEmail(params: {
     <p><b>Роли:</b> ${formatHtml(payload.roles.join(", "))}</p>
     <p><b>Опыт:</b> ${payload.experience} лет</p>
     <p><b>Компании:</b> ${formatHtml(payload.companies.join(", "))}</p>
+    <p><b>Ссылки на вакансии:</b> ${renderVacancyLinks(payload)}</p>
     <p><b>Локация:</b> ${formatHtml(payload.location)}</p>
     <p><b>Готов к переезду:</b> ${payload.openToRelocation ? "Да" : "Нет"}</p>
     <p><b>Telegram:</b> ${formatHtml(payload.telegramContact)}</p>

@@ -12,7 +12,9 @@ type Candidate = {
   roles: string[];
   experience: number;
   companies: string[];
+  vacancyLinks: Record<string, string>;
   sharedCompanies: string[];
+  sharedCompaniesMissingVacancyLinks: string[];
   availableCompanies: string[];
   pendingCompanies: string[];
   connectedCompanies: string[];
@@ -253,6 +255,34 @@ export default function ReferrerCandidatesPage() {
                             )}
                             {companyName}
                           </span>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {candidate.sharedCompanies.map((companyName) => {
+                        const vacancyUrl = candidate.vacancyLinks[companyName];
+
+                        if (vacancyUrl) {
+                          return (
+                            <a
+                              key={`${companyName}-vacancy`}
+                              href={vacancyUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block rounded-xl border border-[#C3DAFE] bg-white px-3 py-2 text-xs font-medium text-[#1863e5] transition-colors hover:bg-[#EBF4FF]"
+                            >
+                              Вакансия в {companyName}
+                            </a>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={`${companyName}-missing`}
+                            className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700"
+                          >
+                            Для {companyName} ссылка на вакансию пока не указана. Это legacy-анкета, её нужно обновить.
+                          </div>
                         );
                       })}
                     </div>

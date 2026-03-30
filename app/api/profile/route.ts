@@ -89,6 +89,7 @@ export async function PATCH(req: NextRequest) {
     where: { userId: user.id },
     select: {
       companies: true,
+      vacancyLinks: true,
       roles: true,
       role: true,
       experience: true,

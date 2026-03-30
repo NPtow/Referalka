@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeVacancyLinks } from "@/lib/profile-form";
 import { prisma } from "@/lib/prisma";
 import { resolveCurrentAppUser } from "@/lib/resolve-current-app-user";
 import {
@@ -60,6 +61,8 @@ export async function POST(req: NextRequest) {
   if (!matchedCompany || !includesNormalizedValue(referrerCompanies, matchedCompany)) {
     return NextResponse.json({ error: "Эта компания не совпадает с профилем реферала." }, { status: 400 });
   }
+
+  const candidateVacancyLinks = normalizeVacancyLinks(candidate.vacancyLinks, candidate.companies);
 
   let connection = await prisma.referralConnection.findUnique({
     where: {
@@ -131,6 +134,7 @@ export async function POST(req: NextRequest) {
         bio: candidate.bio,
         resumeUrl: candidate.resumeUrl,
         resumeFileUrl: candidate.resumeFileUrl,
+        vacancyUrl: candidateVacancyLinks[matchedCompany] ?? null,
       },
       referrer: {
         name: user.firstName,

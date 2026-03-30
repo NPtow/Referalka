@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
       roles: true,
       experience: true,
       companies: true,
+      vacancyLinks: true,
       location: true,
       bio: true,
       isPublic: true,

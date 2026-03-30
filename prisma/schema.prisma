@@ -81,6 +81,7 @@ model Profile {
   id          String   @id @default(cuid())
   userId      Int      @unique
   companies   String[]
+  vacancyLinks Json    @default("{}")
   roles       String[] @default([])
   role        String
   experience  Int

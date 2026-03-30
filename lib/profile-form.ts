@@ -1,8 +1,11 @@
 import type { Profile } from "@prisma/client";
 
+export type VacancyLinks = Record<string, string>;
+
 export type ProfileFormPayload = {
   roles: string[];
   companies: string[];
+  vacancyLinks: VacancyLinks;
   experience: number;
   location: string | null;
   resumeUrl: string | null;
@@ -20,6 +23,52 @@ export type ProfileFormPayload = {
   isPublic: boolean;
   shareWithMatchingReferrers: boolean;
 };
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function isValidVacancyUrl(value: string | null | undefined): boolean {
+  if (!value) return false;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeVacancyLinks(raw: unknown, companies: string[]): VacancyLinks {
+  if (!isPlainObject(raw) || !companies.length) return {};
+
+  const canonicalCompanies = new Map(
+    companies
+      .map((company) => String(company ?? "").trim())
+      .filter(Boolean)
+      .map((company) => [company.toLowerCase(), company] as const),
+  );
+
+  const vacancyLinks: VacancyLinks = {};
+
+  for (const [rawCompany, rawUrl] of Object.entries(raw)) {
+    const companyKey = String(rawCompany ?? "").trim().toLowerCase();
+    const company = canonicalCompanies.get(companyKey);
+    const url = String(rawUrl ?? "").trim();
+
+    if (!company || !url) continue;
+    vacancyLinks[company] = url;
+  }
+
+  return vacancyLinks;
+}
+
+export function getMissingVacancyLinkCompanies(
+  companies: string[],
+  vacancyLinks: VacancyLinks,
+): string[] {
+  return companies.filter((company) => !isValidVacancyUrl(vacancyLinks[company]));
+}
 
 function normalizeString(value: unknown): string | null {
   const text = String(value ?? "").trim();
@@ -55,9 +104,12 @@ function normalizeFileSize(value: unknown): number | null {
 
 export function normalizeProfilePayload(raw: unknown): ProfileFormPayload {
   const body = (raw ?? {}) as Record<string, unknown>;
+  const companies = normalizeStringArray(body.companies);
+
   return {
     roles: normalizeStringArray(body.roles),
-    companies: normalizeStringArray(body.companies),
+    companies,
+    vacancyLinks: normalizeVacancyLinks(body.vacancyLinks, companies),
     experience: normalizeExperience(body.experience),
     location: normalizeString(body.location),
     resumeUrl: normalizeString(body.resumeUrl),
@@ -80,6 +132,9 @@ export function normalizeProfilePayload(raw: unknown): ProfileFormPayload {
 export function validateProfilePayload(payload: ProfileFormPayload): string | null {
   if (!payload.roles.length) return "Выбери хотя бы одну роль.";
   if (!payload.companies.length) return "Выбери хотя бы одну компанию.";
+  if (getMissingVacancyLinkCompanies(payload.companies, payload.vacancyLinks).length) {
+    return "Добавь ссылку на вакансию для каждой выбранной компании.";
+  }
   if (
     !payload.resumeUrl &&
     !payload.resumeText &&
@@ -96,6 +151,7 @@ export function payloadToProfileCreateUpdate(payload: ProfileFormPayload) {
     role: primaryRole,
     roles: payload.roles,
     companies: payload.companies,
+    vacancyLinks: payload.vacancyLinks,
     experience: payload.experience,
     location: payload.location,
     resumeUrl: payload.resumeUrl,
@@ -120,6 +176,7 @@ export function profileToPayload(profile: Pick<Profile,
   | "role"
   | "roles"
   | "companies"
+  | "vacancyLinks"
   | "experience"
   | "location"
   | "resumeUrl"
@@ -140,6 +197,7 @@ export function profileToPayload(profile: Pick<Profile,
   return {
     roles: profile.roles?.length ? profile.roles : [profile.role],
     companies: profile.companies ?? [],
+    vacancyLinks: normalizeVacancyLinks(profile.vacancyLinks, profile.companies ?? []),
     experience: profile.experience ?? 0,
     location: profile.location,
     resumeUrl: profile.resumeUrl,
@@ -160,10 +218,19 @@ export function profileToPayload(profile: Pick<Profile,
 }
 
 export function buildProfileSummary(payload: ProfileFormPayload): string {
+  const vacancyLines = payload.companies
+    .map((company) => {
+      const url = payload.vacancyLinks[company];
+      return isValidVacancyUrl(url) ? `${company} -> ${url}` : null;
+    })
+    .filter(Boolean)
+    .join("\n");
+
   return [
     `Роли: ${payload.roles.join(", ")}`,
     `Опыт: ${payload.experience} лет`,
     `Желаемые компании: ${payload.companies.join(", ")}`,
+    vacancyLines && `Вакансии:\n${vacancyLines}`,
     payload.location && `Локация: ${payload.location}`,
     payload.openToRelocation ? "Готов к переезду" : null,
     payload.bio && `О себе: ${payload.bio}`,

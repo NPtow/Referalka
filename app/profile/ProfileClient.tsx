@@ -5,6 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { COMPANIES_META, ROLES } from "@/lib/constants";
+import {
+  normalizeVacancyLinks,
+  validateProfilePayload,
+  type VacancyLinks,
+} from "@/lib/profile-form";
 import { authClient } from "@/lib/auth-client";
 import CompanyPicker from "@/components/ui/CompanyPicker";
 import Toast from "@/components/ui/Toast";
@@ -15,6 +20,7 @@ interface ProfileData {
   roles: string[];
   experience: number;
   companies: string[];
+  vacancyLinks: VacancyLinks;
   resumeUrl: string | null;
   resumeFileUrl: string | null;
   resumeFileName: string | null;
@@ -54,6 +60,7 @@ type UserKind = "candidate" | "referrer";
 type FormState = {
   roles: string[];
   companies: string[];
+  vacancyLinks: VacancyLinks;
   experience: number;
   location: string;
   resumeUrl: string;
@@ -166,6 +173,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
   const [form, setForm] = useState<FormState>({
     roles: [],
     companies: [],
+    vacancyLinks: {},
     experience: 2,
     location: "",
     resumeUrl: "",
@@ -221,6 +229,7 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
           setForm({
             roles: loadedProfile.roles?.length ? loadedProfile.roles : [loadedProfile.role],
             companies: loadedProfile.companies ?? [],
+            vacancyLinks: normalizeVacancyLinks(loadedProfile.vacancyLinks, loadedProfile.companies ?? []),
             experience: loadedProfile.experience ?? 0,
             location: loadedProfile.location ?? "",
             resumeUrl: loadedProfile.resumeUrl ?? "",
@@ -341,9 +350,28 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
     }));
   };
 
+  const updateCandidateCompanies = (companies: string[]) => {
+    setForm((prev) => ({
+      ...prev,
+      companies,
+      vacancyLinks: normalizeVacancyLinks(prev.vacancyLinks, companies),
+    }));
+  };
+
+  const updateVacancyLink = (company: string, url: string) => {
+    setForm((prev) => ({
+      ...prev,
+      vacancyLinks: {
+        ...prev.vacancyLinks,
+        [company]: url,
+      },
+    }));
+  };
+
   const collectPayload = () => ({
     roles: form.roles,
     companies: form.companies,
+    vacancyLinks: normalizeVacancyLinks(form.vacancyLinks, form.companies),
     experience: form.experience,
     location: form.location || null,
     resumeUrl: form.resumeUrl || null,
@@ -373,11 +401,8 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
       return null;
     }
 
-    if (!form.roles.length) return "Выбери хотя бы одну роль.";
-    if (!form.companies.length) return "Выбери хотя бы одну компанию.";
     if (!Number.isFinite(form.experience) || form.experience < 0) return "Укажи корректный опыт.";
-    if (!hasAnyResume) return "Добавь резюме файлом, ссылкой или текстом.";
-    return null;
+    return validateProfilePayload(collectPayload());
   };
 
   const handleUploadResume = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -733,10 +758,34 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
                 <CompanyPicker
                   options={COMPANY_OPTIONS}
                   values={form.companies}
-                  onChange={(values) => updateForm("companies", values)}
+                  onChange={updateCandidateCompanies}
                   multiple
                   placeholder="Поиск компании или добавление своей"
                 />
+                {form.companies.length > 0 && (
+                  <div className="mt-4 rounded-2xl border border-[#EBF4FF] bg-[#F7FAFC] p-4">
+                    <FieldLabel required>Ссылки на вакансии</FieldLabel>
+                    <p className="mb-3 text-xs text-[#718096]">
+                      Для каждой выбранной компании добавь ссылку на конкретную вакансию.
+                    </p>
+                    <div className="space-y-3">
+                      {form.companies.map((company) => (
+                        <div key={company}>
+                          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#718096]">
+                            {company}
+                          </label>
+                          <input
+                            type="url"
+                            value={form.vacancyLinks[company] ?? ""}
+                            onChange={(event) => updateVacancyLink(company, event.target.value)}
+                            placeholder="https://..."
+                            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-[#171923] placeholder-[#A0AEC0] outline-none focus:border-[#1863e5]"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

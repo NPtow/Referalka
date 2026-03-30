@@ -29,6 +29,23 @@ function isEmail(value: string | null | undefined): value is string {
   return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
 }
 
+function renderVacancyLinks(params: {
+  companies: string[];
+  vacancyLinks: Record<string, string>;
+}): string {
+  const items = params.companies
+    .map((company) => {
+      const url = params.vacancyLinks[company];
+      if (!url) return `<li><b>${escapeHtml(company)}:</b> ссылка не указана</li>`;
+      const safeUrl = escapeHtml(url);
+      return `<li><b>${escapeHtml(company)}:</b> <a href="${safeUrl}" target="_blank" rel="noreferrer">${safeUrl}</a></li>`;
+    })
+    .filter(Boolean);
+
+  if (!items.length) return "—";
+  return `<ul>${items.join("")}</ul>`;
+}
+
 function getReferralAdminEmail(): string | null {
   const value = process.env.REFERRAL_ADMIN_EMAIL || process.env.APPLICATION_TO_EMAIL || null;
   return isEmail(value) ? value : null;
@@ -114,6 +131,7 @@ export async function sendMatchingCandidateEmailToReferrer(params: {
     <p><b>Опыт:</b> ${params.payload.experience} лет</p>
     <p><b>Хочет попасть в:</b> ${formatText(params.payload.companies.join(", "))}</p>
     <p><b>Совпадающие компании:</b> ${formatText(params.sharedCompanies.join(", "))}</p>
+    <p><b>Вакансии по совпадающим компаниям:</b> ${renderVacancyLinks({ companies: params.sharedCompanies, vacancyLinks: params.payload.vacancyLinks })}</p>
     <p><b>Локация:</b> ${formatText(params.payload.location)}</p>
     <p><b>О себе:</b><br/>${formatText(params.payload.bio)}</p>
     <p><b>Резюме:</b> ${params.payload.resumeFileUrl ? link("Файл", params.payload.resumeFileUrl) : params.payload.resumeUrl ? link("Ссылка", params.payload.resumeUrl) : "Внутри профиля"}</p>
@@ -143,6 +161,7 @@ export async function sendReferralMatchPendingEmails(params: {
     bio: string | null;
     resumeUrl: string | null;
     resumeFileUrl: string | null;
+    vacancyUrl: string | null;
   };
   referrer: {
     name: string;
@@ -174,6 +193,7 @@ export async function sendReferralMatchPendingEmails(params: {
     <p><b>Направления:</b> ${formatText(params.referrer.roles.join(", "))}</p>
     <p><b>Компании:</b> ${formatText(params.referrer.companies.join(", "))}</p>
     <p><b>Как оплатить:</b> свяжись по ${formatText(paymentContact)} и подтвердим оплату вручную.</p>
+    <p><b>Вакансия:</b> ${params.candidate.vacancyUrl ? link("Открыть вакансию", params.candidate.vacancyUrl) : "Ссылка на вакансию не указана"}</p>
     <p><b>Если нужен человек:</b> ${formatText(adminEmail)}</p>
     <p>После подтверждения оплаты мы пришлём контакты обеим сторонам отдельным письмом.</p>
   `;
@@ -188,6 +208,7 @@ export async function sendReferralMatchPendingEmails(params: {
     <p><b>Роли кандидата:</b> ${formatText(params.candidate.roles.join(", "))}</p>
     <p><b>Опыт:</b> ${params.candidate.experience} лет</p>
     <p><b>Компании кандидата:</b> ${formatText(params.candidate.companies.join(", "))}</p>
+    <p><b>Вакансия кандидата по этой компании:</b> ${params.candidate.vacancyUrl ? link("Открыть вакансию", params.candidate.vacancyUrl) : "Ссылка на вакансию не указана"}</p>
     <p><b>Резюме кандидата:</b> ${params.candidate.resumeFileUrl ? link("Файл", params.candidate.resumeFileUrl) : params.candidate.resumeUrl ? link("Ссылка", params.candidate.resumeUrl) : "—"}</p>
     <hr />
     <p><b>Рефер:</b> ${formatText(params.referrer.name)}</p>

@@ -8,6 +8,7 @@ interface CandidateRow {
   roles: string[];
   experience: number;
   companies: string[];
+  vacancyLinks: Record<string, string>;
   location: string | null;
   bio: string | null;
   isPublic: boolean;
@@ -133,6 +134,27 @@ export default function AdminCandidatesPage() {
                               {name}
                             </span>
                           ))}
+                        </div>
+                        <div className="mt-3 space-y-1">
+                          {c.companies.map((name) => {
+                            const vacancyUrl = c.vacancyLinks?.[name];
+
+                            return vacancyUrl ? (
+                              <a
+                                key={`${name}-vacancy`}
+                                href={vacancyUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block text-xs text-[#1863e5] hover:underline"
+                              >
+                                {name}: вакансия
+                              </a>
+                            ) : (
+                              <p key={`${name}-missing`} className="text-xs text-amber-700">
+                                {name}: ссылка на вакансию не указана
+                              </p>
+                            );
+                          })}
                         </div>
                       </div>
 

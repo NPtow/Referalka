@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { normalizeVacancyLinks } from "@/lib/profile-form";
 import { prisma } from "@/lib/prisma";
 import { resolveCurrentAppUser } from "@/lib/resolve-current-app-user";
 import {
@@ -57,6 +58,7 @@ export async function GET() {
   const matchedCandidates = candidates
     .map((candidate) => {
       const sharedCompanies = intersectByNormalizedValue(candidate.companies, referrerCompanies);
+      const vacancyLinks = normalizeVacancyLinks(candidate.vacancyLinks, candidate.companies);
       const candidateConnections = connectionsByCandidate.get(candidate.userId) ?? [];
       const pendingCompanies = candidateConnections
         .filter((connection) =>
@@ -73,6 +75,7 @@ export async function GET() {
       const availableCompanies = sharedCompanies.filter((companyName) =>
         ![...pendingCompanies, ...connectedCompanies].some((item) => normalizeMatchingValue(item) === normalizeMatchingValue(companyName))
       );
+      const sharedCompaniesMissingVacancyLinks = sharedCompanies.filter((companyName) => !vacancyLinks[companyName]);
 
       return {
         id: candidate.id,
@@ -80,7 +83,9 @@ export async function GET() {
         roles: candidate.roles,
         experience: candidate.experience,
         companies: candidate.companies,
+        vacancyLinks,
         sharedCompanies,
+        sharedCompaniesMissingVacancyLinks,
         availableCompanies,
         pendingCompanies,
         connectedCompanies,
