@@ -5,12 +5,21 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma migrate deploy && prisma generate && next build",
-    "start": "next start"
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "email:vacancy-links": "tsx scripts/send-vacancy-link-reminders.ts",
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "node ./scripts/run-integration-tests.mjs",
+    "test:e2e": "node ./scripts/run-e2e-local.mjs",
+    "test:e2e:preview": "playwright test tests/e2e/preview-smoke.spec.ts",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@better-auth/prisma-adapter": "^1.5.5",
     "@prisma/client": "^5.22.0",
     "@vercel/blob": "^2.3.1",
+    "@vercel/speed-insights": "^2.0.0",
     "better-auth": "^1.5.5",
     "mammoth": "^1.11.0",
     "next": "16.1.6",
@@ -23,13 +32,16 @@
     "seed": "npx tsx prisma/seed.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.19.35",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.1.1",
     "tailwindcss": "^4",
     "tsx": "^4.19.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.1"
   }
 }

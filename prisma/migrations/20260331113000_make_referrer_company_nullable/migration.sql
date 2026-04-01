@@ -1,0 +1,2 @@
+ALTER TABLE "Referrer"
+ALTER COLUMN "company" DROP NOT NULL;

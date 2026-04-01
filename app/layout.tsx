@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter_Tight, DM_Sans } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 
@@ -55,6 +56,7 @@ ym(107181480, 'init', {
         </noscript>
         <Navbar />
         {children}
+        <SpeedInsights />
       </body>
     </html>
   );

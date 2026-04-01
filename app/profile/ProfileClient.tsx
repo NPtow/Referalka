@@ -86,6 +86,13 @@ type ReferrerFormState = {
   linkedinUrl: string;
 };
 
+type DraftSaveStatus = "idle" | "saving" | "saved" | "error";
+
+type DraftSaveState = {
+  status: DraftSaveStatus;
+  message: string | null;
+};
+
 type SessionUser = {
   name: string;
   email: string;
@@ -93,6 +100,8 @@ type SessionUser = {
 };
 
 const COMPANY_OPTIONS = COMPANIES_META.map((company) => company.name);
+
+const AUTOSAVE_DEBOUNCE_MS = 1500;
 
 function formatDate(iso: string | null): string {
   if (!iso) return "";
@@ -135,6 +144,53 @@ function normalizeReferrerData(referrer: ReferrerData): ReferrerData {
   };
 }
 
+function createInitialCandidateForm(): FormState {
+  return {
+    roles: [],
+    companies: [],
+    vacancyLinks: {},
+    experience: 2,
+    location: "",
+    resumeUrl: "",
+    resumeFileUrl: null,
+    resumeFileName: null,
+    resumeFileMime: null,
+    resumeFileSize: null,
+    resumeText: "",
+    telegramContact: "",
+    linkedinUrl: "",
+    githubUrl: "",
+    siteUrl: "",
+    bio: "",
+    openToRelocation: false,
+    isPublic: false,
+    shareWithMatchingReferrers: false,
+  };
+}
+
+function createInitialReferrerForm(): ReferrerFormState {
+  return {
+    companies: [],
+    roles: [],
+    telegramContact: "",
+    linkedinUrl: "",
+  };
+}
+
+function buildDraftStatusLabel(state: DraftSaveState): string {
+  if (state.status === "saving") return "Сохраняем...";
+  if (state.status === "saved") return state.message ?? "Черновик сохранён";
+  if (state.status === "error") return state.message ?? "Не удалось сохранить черновик";
+  return "Профиль сохраняется автоматически";
+}
+
+function buildDraftStatusTone(state: DraftSaveState): string {
+  if (state.status === "saving") return "text-[#4A5568]";
+  if (state.status === "saved") return "text-emerald-700";
+  if (state.status === "error") return "text-red-600";
+  return "text-[#718096]";
+}
+
 function FieldLabel({
   children,
   required = false,
@@ -170,44 +226,30 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [referrer, setReferrer] = useState<ReferrerData | null>(null);
   const [userKind, setUserKind] = useState<UserKind>("candidate");
-  const [form, setForm] = useState<FormState>({
-    roles: [],
-    companies: [],
-    vacancyLinks: {},
-    experience: 2,
-    location: "",
-    resumeUrl: "",
-    resumeFileUrl: null,
-    resumeFileName: null,
-    resumeFileMime: null,
-    resumeFileSize: null,
-    resumeText: "",
-    telegramContact: "",
-    linkedinUrl: "",
-    githubUrl: "",
-    siteUrl: "",
-    bio: "",
-    openToRelocation: false,
-    isPublic: false,
-    shareWithMatchingReferrers: false,
-  });
-  const [referrerForm, setReferrerForm] = useState<ReferrerFormState>({
-    companies: [],
-    roles: [],
-    telegramContact: "",
-    linkedinUrl: "",
-  });
+  const [form, setForm] = useState<FormState>(() => createInitialCandidateForm());
+  const [referrerForm, setReferrerForm] = useState<ReferrerFormState>(() => createInitialReferrerForm());
   const [customRole, setCustomRole] = useState("");
   const [customReferrerRole, setCustomReferrerRole] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [lastSubmittedStatus, setLastSubmittedStatus] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [candidateDraftState, setCandidateDraftState] = useState<DraftSaveState>({ status: "idle", message: null });
+  const [referrerDraftState, setReferrerDraftState] = useState<DraftSaveState>({ status: "idle", message: null });
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const autosaveReadyRef = useRef(false);
+  const candidateAutosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const referrerAutosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const candidateLastSavedSignatureRef = useRef("");
+  const referrerLastSavedSignatureRef = useRef("");
+  const candidateSavePromiseRef = useRef<Promise<void> | null>(null);
+  const referrerSavePromiseRef = useRef<Promise<void> | null>(null);
+  const candidateResaveRequestedRef = useRef(false);
+  const referrerResaveRequestedRef = useRef(false);
 
   useEffect(() => {
     Promise.all([fetch("/api/profile"), fetch("/api/referrer")])
@@ -284,7 +326,6 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
 
   const displayUsername = profile?.user.username || sessionUser.email || null;
   const displayPhoto = profile?.user.photoUrl || sessionUser.image || null;
-  const hasAnyResume = Boolean(form.resumeFileUrl || form.resumeUrl.trim() || form.resumeText.trim());
   const candidateProfileCompleted = Boolean(profile?.applicationSubmittedAt || lastSubmittedStatus);
   const referrerProfileCompleted = Boolean(
     referrer
@@ -294,6 +335,27 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
   const shouldShowProfileBanner = userKind === "candidate"
     ? !candidateProfileCompleted
     : !referrerProfileCompleted;
+
+  const collectReferrerPayload = () => ({
+    company: referrerForm.companies[0] ?? null,
+    companies: referrerForm.companies,
+    role: referrerForm.roles[0] ?? null,
+    roles: referrerForm.roles,
+    telegramContact: referrerForm.telegramContact || null,
+    linkedinUrl: referrerForm.linkedinUrl || null,
+  });
+
+  const clearCandidateAutosaveTimer = () => {
+    if (!candidateAutosaveTimerRef.current) return;
+    clearTimeout(candidateAutosaveTimerRef.current);
+    candidateAutosaveTimerRef.current = null;
+  };
+
+  const clearReferrerAutosaveTimer = () => {
+    if (!referrerAutosaveTimerRef.current) return;
+    clearTimeout(referrerAutosaveTimerRef.current);
+    referrerAutosaveTimerRef.current = null;
+  };
 
   const updateForm = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -390,20 +452,148 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
     shareWithMatchingReferrers: form.shareWithMatchingReferrers,
   });
 
-  const validateForm = (): string | null => {
-    if (userKind === "referrer") {
-      if (!referrerForm.companies.length) {
-        return "Укажи хотя бы одну компанию, в которую ты можешь порефералить.";
-      }
-      if (!referrerForm.roles.length) {
-        return "Укажи, кем ты работаешь или по каким ролям можешь помочь.";
-      }
-      return null;
+  const saveCandidateDraft = async (payloadOverride?: ReturnType<typeof collectPayload>) => {
+    const payload = payloadOverride ?? collectPayload();
+    const signature = JSON.stringify(payload);
+
+    if (signature === candidateLastSavedSignatureRef.current) {
+      return;
     }
 
-    if (!Number.isFinite(form.experience) || form.experience < 0) return "Укажи корректный опыт.";
-    return validateProfilePayload(collectPayload());
+    if (candidateSavePromiseRef.current) {
+      candidateResaveRequestedRef.current = true;
+      return candidateSavePromiseRef.current;
+    }
+
+    const request = (async () => {
+      setCandidateDraftState({ status: "saving", message: null });
+
+      try {
+        const response = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await response.json();
+
+        if (!response.ok || !json.profile) {
+          throw new Error(json.error ?? "Не удалось сохранить черновик");
+        }
+
+        setProfile(json.profile as ProfileData);
+        candidateLastSavedSignatureRef.current = signature;
+        setCandidateDraftState({ status: "saved", message: "Черновик сохранён" });
+      } catch (draftError) {
+        setCandidateDraftState({
+          status: "error",
+          message: draftError instanceof Error ? draftError.message : "Не удалось сохранить черновик",
+        });
+      } finally {
+        candidateSavePromiseRef.current = null;
+        if (candidateResaveRequestedRef.current) {
+          candidateResaveRequestedRef.current = false;
+          await saveCandidateDraft();
+        }
+      }
+    })();
+
+    candidateSavePromiseRef.current = request;
+    return request;
   };
+
+  const saveReferrerDraft = async (payloadOverride?: ReturnType<typeof collectReferrerPayload>) => {
+    const payload = payloadOverride ?? collectReferrerPayload();
+    const signature = JSON.stringify(payload);
+
+    if (signature === referrerLastSavedSignatureRef.current) {
+      return;
+    }
+
+    if (referrerSavePromiseRef.current) {
+      referrerResaveRequestedRef.current = true;
+      return referrerSavePromiseRef.current;
+    }
+
+    const request = (async () => {
+      setReferrerDraftState({ status: "saving", message: null });
+
+      try {
+        const response = await fetch("/api/referrer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await response.json();
+
+        if (!response.ok || !json.referrer) {
+          throw new Error(json.error ?? "Не удалось сохранить профиль реферала");
+        }
+
+        const savedReferrer = normalizeReferrerData(json.referrer as ReferrerData);
+        setReferrer(savedReferrer);
+        referrerLastSavedSignatureRef.current = signature;
+        setReferrerDraftState({ status: "saved", message: "Черновик сохранён" });
+      } catch (draftError) {
+        setReferrerDraftState({
+          status: "error",
+          message: draftError instanceof Error ? draftError.message : "Не удалось сохранить профиль реферала",
+        });
+      } finally {
+        referrerSavePromiseRef.current = null;
+        if (referrerResaveRequestedRef.current) {
+          referrerResaveRequestedRef.current = false;
+          await saveReferrerDraft();
+        }
+      }
+    })();
+
+    referrerSavePromiseRef.current = request;
+    return request;
+  };
+
+  useEffect(() => {
+    if (loading || autosaveReadyRef.current) return;
+
+    candidateLastSavedSignatureRef.current = JSON.stringify(collectPayload());
+    referrerLastSavedSignatureRef.current = JSON.stringify(collectReferrerPayload());
+    autosaveReadyRef.current = true;
+  }, [loading, form, referrerForm]);
+
+  useEffect(() => {
+    if (!autosaveReadyRef.current) return;
+
+    const payload = collectPayload();
+    const signature = JSON.stringify(payload);
+    clearCandidateAutosaveTimer();
+
+    if (signature === candidateLastSavedSignatureRef.current) {
+      return;
+    }
+
+    candidateAutosaveTimerRef.current = setTimeout(() => {
+      void saveCandidateDraft(payload);
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return clearCandidateAutosaveTimer;
+  }, [form]);
+
+  useEffect(() => {
+    if (!autosaveReadyRef.current) return;
+
+    const payload = collectReferrerPayload();
+    const signature = JSON.stringify(payload);
+    clearReferrerAutosaveTimer();
+
+    if (signature === referrerLastSavedSignatureRef.current) {
+      return;
+    }
+
+    referrerAutosaveTimerRef.current = setTimeout(() => {
+      void saveReferrerDraft(payload);
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return clearReferrerAutosaveTimer;
+  }, [referrerForm]);
 
   const handleUploadResume = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -446,8 +636,13 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
   const handleSubmitApplication = async () => {
     setError(null);
     setToastMessage(null);
+    clearCandidateAutosaveTimer();
+    if (candidateSavePromiseRef.current) {
+      await candidateSavePromiseRef.current;
+    }
 
-    const validationError = validateForm();
+    const payload = collectPayload();
+    const validationError = validateProfilePayload(payload);
     if (validationError) {
       setError(validationError);
       return;
@@ -456,42 +651,11 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
     setSubmitting(true);
 
     try {
-      if (userKind === "referrer") {
-        const response = await fetch("/api/referrer", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            company: referrerForm.companies[0] ?? null,
-            companies: referrerForm.companies,
-            role: referrerForm.roles[0] ?? null,
-            roles: referrerForm.roles,
-            telegramContact: referrerForm.telegramContact || null,
-            linkedinUrl: referrerForm.linkedinUrl || null,
-          }),
-        });
-        const json = await response.json();
-
-        if (!response.ok || !json.referrer) {
-          setError(json.error ?? "Не удалось сохранить профиль реферала.");
-          return;
-        }
-
-        const savedReferrer = normalizeReferrerData(json.referrer as ReferrerData);
-        setReferrer(savedReferrer);
-        setReferrerForm({
-          companies: savedReferrer.companies ?? [],
-          roles: savedReferrer.roles ?? [],
-          telegramContact: savedReferrer.telegramContact ?? "",
-          linkedinUrl: savedReferrer.linkedinUrl ?? "",
-        });
-        setToastMessage("Профиль реферала сохранен");
-        return;
-      }
 
       const response = await fetch("/api/profile/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(collectPayload()),
+        body: JSON.stringify(payload),
       });
       const json = await response.json();
 
@@ -506,6 +670,8 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
 
       const submittedAt = json.submittedAt ?? json.profile?.applicationSubmittedAt ?? new Date().toISOString();
       if (json.profile) setProfile(json.profile as ProfileData);
+      candidateLastSavedSignatureRef.current = JSON.stringify(payload);
+      setCandidateDraftState({ status: "saved", message: "Черновик сохранён" });
       setLastSubmittedStatus(`Последняя заявка отправлена: ${formatDate(submittedAt)}`);
       const notifiedReferrers = Number(json.referrerNotificationsSent ?? 0);
       setToastMessage(
@@ -555,8 +721,8 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
             </h1>
             <p className="text-sm text-[#4A5568]">
               {userKind === "candidate"
-                ? "После нажатия кнопки внизу мы сохраним профиль и отправим заявку владельцу сервиса."
-                : "Укажи компании, роли и контакты, чтобы получать релевантные обращения от кандидатов."}
+                ? "Профиль сохраняется автоматически. Кнопка внизу нужна только для отправки заявки."
+                : "Профиль реферала сохраняется автоматически. Заполни компании, роли и контакты, чтобы получать релевантные обращения."}
             </p>
           </div>
         )}
@@ -1059,21 +1225,24 @@ export default function ProfileClient({ sessionUser }: { sessionUser: SessionUse
           </div>
         )}
 
-        <div>
-          <button
-            type="button"
-            onClick={handleSubmitApplication}
-            disabled={submitting}
-            className="w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors disabled:opacity-60"
-          >
-            {submitting
-              ? userKind === "candidate"
-                ? "Отправляю заявку..."
-                : "Сохраняю профиль..."
-              : userKind === "candidate"
-                ? "Подать заявку"
-                : "Сохранить профиль реферала"}
-          </button>
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <p className={`text-sm font-medium ${buildDraftStatusTone(userKind === "candidate" ? candidateDraftState : referrerDraftState)}`}>
+            {buildDraftStatusLabel(userKind === "candidate" ? candidateDraftState : referrerDraftState)}
+          </p>
+          {userKind === "candidate" ? (
+            <button
+              type="button"
+              onClick={handleSubmitApplication}
+              disabled={submitting}
+              className="mt-3 w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors disabled:opacity-60"
+            >
+              {submitting ? "Отправляю заявку..." : "Подать заявку"}
+            </button>
+          ) : (
+            <p className="mt-2 text-xs text-[#718096]">
+              После заполнения профиля откроется доступ к подходящим кандидатам.
+            </p>
+          )}
         </div>
 
         {userKind === "referrer" && referrerProfileCompleted && (

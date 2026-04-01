@@ -123,7 +123,7 @@ model ProfileView {
 model Referrer {
   id          String   @id @default(cuid())
   userId      Int      @unique
-  company     String
+  company     String?
   companies   String[] @default([])
   role        String?
   roles       String[] @default([])

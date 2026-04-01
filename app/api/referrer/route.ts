@@ -32,7 +32,7 @@ function normalizeStringArray(value: unknown): string[] {
 function serializeReferrer(referrer: {
   id: string;
   userId: number;
-  company: string;
+  company: string | null;
   companies: string[];
   role: string | null;
   roles: string[];
@@ -67,29 +67,21 @@ export async function POST(req: NextRequest) {
     const linkedinUrl = normalizeString(body.linkedinUrl);
     const telegramContact = normalizeString(body.telegramContact);
 
-    if (!resolvedCompanies.length) {
-      return NextResponse.json({ error: "companies required" }, { status: 400 });
-    }
-
-    if (!resolvedRoles.length) {
-      return NextResponse.json({ error: "roles required" }, { status: 400 });
-    }
-
     const referrer = await prisma.referrer.upsert({
       where: { userId: user.id },
       update: {
-        company: resolvedCompanies[0],
+        company: resolvedCompanies[0] ?? null,
         companies: resolvedCompanies,
-        role: resolvedRoles[0],
+        role: resolvedRoles[0] ?? null,
         roles: resolvedRoles,
         linkedinUrl,
         telegramContact,
       },
       create: {
         userId: user.id,
-        company: resolvedCompanies[0],
+        company: resolvedCompanies[0] ?? null,
         companies: resolvedCompanies,
-        role: resolvedRoles[0],
+        role: resolvedRoles[0] ?? null,
         roles: resolvedRoles,
         linkedinUrl,
         telegramContact,

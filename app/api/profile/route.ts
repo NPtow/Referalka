@@ -6,18 +6,43 @@ import {
   normalizeProfilePayload,
   payloadToProfileCreateUpdate,
   profileToPayload,
-  validateProfilePayload,
 } from "@/lib/profile-form";
+
+const draftProfileSelect = {
+  companies: true,
+  vacancyLinks: true,
+  roles: true,
+  role: true,
+  experience: true,
+  resumeUrl: true,
+  resumeFileUrl: true,
+  resumeFileName: true,
+  resumeFileMime: true,
+  resumeFileSize: true,
+  telegramContact: true,
+  linkedinUrl: true,
+  githubUrl: true,
+  siteUrl: true,
+  bio: true,
+  location: true,
+  openToRelocation: true,
+  isPublic: true,
+  shareWithMatchingReferrers: true,
+  resumeText: true,
+} as const;
 
 export async function POST(req: NextRequest) {
   const user = await resolveCurrentAppUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const payload = normalizeProfilePayload(await req.json());
-  const validationError = validateProfilePayload(payload);
-  if (validationError) {
-    return NextResponse.json({ error: validationError }, { status: 400 });
-  }
+  const body = await req.json();
+  const existing = await prisma.profile.findUnique({
+    where: { userId: user.id },
+    select: draftProfileSelect,
+  });
+  const payload = normalizeProfilePayload(
+    existing ? { ...profileToPayload(existing), ...body } : body,
+  );
 
   const profile = await prisma.profile.upsert({
     where: { userId: user.id },
@@ -87,28 +112,7 @@ export async function PATCH(req: NextRequest) {
 
   const existing = await prisma.profile.findUnique({
     where: { userId: user.id },
-    select: {
-      companies: true,
-      vacancyLinks: true,
-      roles: true,
-      role: true,
-      experience: true,
-      resumeUrl: true,
-      resumeFileUrl: true,
-      resumeFileName: true,
-      resumeFileMime: true,
-      resumeFileSize: true,
-      telegramContact: true,
-      linkedinUrl: true,
-      githubUrl: true,
-      siteUrl: true,
-      bio: true,
-      location: true,
-      openToRelocation: true,
-      isPublic: true,
-      shareWithMatchingReferrers: true,
-      resumeText: true,
-    },
+    select: draftProfileSelect,
   });
 
   if (!existing) {
@@ -119,10 +123,6 @@ export async function PATCH(req: NextRequest) {
     ...profileToPayload(existing),
     ...(await req.json()),
   });
-  const validationError = validateProfilePayload(incoming);
-  if (validationError) {
-    return NextResponse.json({ error: validationError }, { status: 400 });
-  }
 
   const profile = await prisma.profile.update({
     where: { userId: user.id },

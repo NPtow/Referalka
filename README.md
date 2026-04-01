@@ -3,6 +3,7 @@
 Product documentation:
 
 - Referrer intro flow: [docs/referrer-intro-flow.md](/Users/NIKITA/Downloads/referalocka/docs/referrer-intro-flow.md)
+- Testing setup: [docs/testing.md](/Users/NIKITA/Downloads/referalocka/docs/testing.md)
 
 This is a Next.js + Prisma project for referral matching between candidates and referrers.
 

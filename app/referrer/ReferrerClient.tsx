@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { COMPANIES_META, ROLES } from "@/lib/constants";
 import CompanyPicker from "@/components/ui/CompanyPicker";
@@ -27,7 +26,15 @@ type ReferrerFormState = {
   linkedinUrl: string;
 };
 
+type DraftSaveStatus = "idle" | "saving" | "saved" | "error";
+
+type DraftSaveState = {
+  status: DraftSaveStatus;
+  message: string | null;
+};
+
 const COMPANY_OPTIONS = COMPANIES_META.map((company) => company.name);
+const AUTOSAVE_DEBOUNCE_MS = 1500;
 
 function normalizeReferrer(referrer: ReferrerData): ReferrerData {
   const companies = referrer.companies?.length
@@ -50,23 +57,59 @@ function normalizeReferrer(referrer: ReferrerData): ReferrerData {
   };
 }
 
-export default function ReferrerClient({ viewer }: { viewer: Viewer }) {
-  const router = useRouter();
-  const isSignedIn = Boolean(viewer?.email);
-
-  const [form, setForm] = useState<ReferrerFormState>({
+function createInitialReferrerForm(): ReferrerFormState {
+  return {
     companies: [],
     roles: [],
     telegramContact: "",
     linkedinUrl: "",
-  });
+  };
+}
+
+function buildDraftStatusLabel(state: DraftSaveState): string {
+  if (state.status === "saving") return "Сохраняем...";
+  if (state.status === "saved") return state.message ?? "Черновик сохранён";
+  if (state.status === "error") return state.message ?? "Не удалось сохранить профиль";
+  return "Профиль сохраняется автоматически";
+}
+
+function buildDraftStatusTone(state: DraftSaveState): string {
+  if (state.status === "saving") return "text-[#4A5568]";
+  if (state.status === "saved") return "text-emerald-700";
+  if (state.status === "error") return "text-red-600";
+  return "text-[#718096]";
+}
+
+export default function ReferrerClient({ viewer }: { viewer: Viewer }) {
+  const isSignedIn = Boolean(viewer?.email);
+
+  const [form, setForm] = useState<ReferrerFormState>(() => createInitialReferrerForm());
+  const [savedReferrer, setSavedReferrer] = useState<ReferrerData | null>(null);
   const [customRole, setCustomRole] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [done, setDone] = useState(false);
+  const [draftState, setDraftState] = useState<DraftSaveState>({ status: "idle", message: null });
+  const autosaveReadyRef = useRef(false);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedSignatureRef = useRef("");
+  const savePromiseRef = useRef<Promise<void> | null>(null);
+  const resaveRequestedRef = useRef(false);
 
   const displayName =
     viewer?.name?.trim() || viewer?.email?.split("@")[0] || "Пользователь";
+
+  const collectPayload = () => ({
+    company: form.companies[0] ?? null,
+    companies: form.companies,
+    role: form.roles[0] ?? null,
+    roles: form.roles,
+    telegramContact: form.telegramContact || null,
+    linkedinUrl: form.linkedinUrl || null,
+  });
+
+  const clearAutosaveTimer = () => {
+    if (!autosaveTimerRef.current) return;
+    clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = null;
+  };
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -78,16 +121,118 @@ export default function ReferrerClient({ viewer }: { viewer: Viewer }) {
         return normalizeReferrer(json.referrer as ReferrerData);
       })
       .then((referrer) => {
-        if (!referrer) return;
+        const nextReferrer = referrer ? normalizeReferrer(referrer) : null;
+        setSavedReferrer(nextReferrer);
+
+        if (!nextReferrer) {
+          lastSavedSignatureRef.current = JSON.stringify({
+            company: null,
+            companies: [],
+            role: null,
+            roles: [],
+            telegramContact: null,
+            linkedinUrl: null,
+          });
+          autosaveReadyRef.current = true;
+          return;
+        }
+
         setForm({
-          companies: referrer.companies,
-          roles: referrer.roles,
-          telegramContact: referrer.telegramContact ?? "",
-          linkedinUrl: referrer.linkedinUrl ?? "",
+          companies: nextReferrer.companies,
+          roles: nextReferrer.roles,
+          telegramContact: nextReferrer.telegramContact ?? "",
+          linkedinUrl: nextReferrer.linkedinUrl ?? "",
         });
+        lastSavedSignatureRef.current = JSON.stringify({
+          company: nextReferrer.companies[0] ?? null,
+          companies: nextReferrer.companies,
+          role: nextReferrer.roles[0] ?? null,
+          roles: nextReferrer.roles,
+          telegramContact: nextReferrer.telegramContact,
+          linkedinUrl: nextReferrer.linkedinUrl,
+        });
+        autosaveReadyRef.current = true;
       })
-      .catch(() => {});
+      .catch(() => {
+        lastSavedSignatureRef.current = JSON.stringify({
+          company: null,
+          companies: [],
+          role: null,
+          roles: [],
+          telegramContact: null,
+          linkedinUrl: null,
+        });
+        autosaveReadyRef.current = true;
+      });
   }, [isSignedIn]);
+
+  const saveDraft = async (payloadOverride?: ReturnType<typeof collectPayload>) => {
+    const payload = payloadOverride ?? collectPayload();
+    const signature = JSON.stringify(payload);
+
+    if (signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    if (savePromiseRef.current) {
+      resaveRequestedRef.current = true;
+      return savePromiseRef.current;
+    }
+
+    const request = (async () => {
+      setDraftState({ status: "saving", message: null });
+
+      try {
+        const response = await fetch("/api/referrer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await response.json();
+
+        if (!response.ok || !json.referrer) {
+          throw new Error(json.error ?? "Не удалось сохранить профиль");
+        }
+
+        const normalized = normalizeReferrer(json.referrer as ReferrerData);
+        setSavedReferrer(normalized);
+        lastSavedSignatureRef.current = signature;
+        setDraftState({ status: "saved", message: "Черновик сохранён" });
+      } catch (draftError) {
+        setDraftState({
+          status: "error",
+          message: draftError instanceof Error ? draftError.message : "Не удалось сохранить профиль",
+        });
+      } finally {
+        savePromiseRef.current = null;
+        if (resaveRequestedRef.current) {
+          resaveRequestedRef.current = false;
+          await saveDraft();
+        }
+      }
+    })();
+
+    savePromiseRef.current = request;
+    return request;
+  };
+
+  useEffect(() => {
+    if (!autosaveReadyRef.current) return;
+
+    const payload = collectPayload();
+    const signature = JSON.stringify(payload);
+    clearAutosaveTimer();
+
+    if (signature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    autosaveTimerRef.current = setTimeout(() => {
+      void saveDraft(payload);
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return clearAutosaveTimer;
+  }, [form]);
 
   const toggleRole = (role: string) => {
     setForm((prev) => {
@@ -113,47 +258,11 @@ export default function ReferrerClient({ viewer }: { viewer: Viewer }) {
     setForm((prev) => ({ ...prev, roles: prev.roles.filter((item) => item !== role) }));
   };
 
-  const handleSave = async () => {
-    if (!form.companies.length) {
-      setError("Выбери хотя бы одну компанию.");
-      return;
-    }
-    if (!form.roles.length) {
-      setError("Укажи хотя бы одну роль.");
-      return;
-    }
-
-    setError(null);
-    setSaving(true);
-
-    try {
-      const response = await fetch("/api/referrer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company: form.companies[0] ?? null,
-          companies: form.companies,
-          role: form.roles[0] ?? null,
-          roles: form.roles,
-          telegramContact: form.telegramContact || null,
-          linkedinUrl: form.linkedinUrl || null,
-        }),
-      });
-
-      const json = await response.json();
-      if (!response.ok || !json.referrer) {
-        setError(json.error ?? "Не удалось сохранить профиль реферала.");
-        return;
-      }
-
-      setDone(true);
-      setTimeout(() => router.push("/profile"), 1500);
-    } catch {
-      setError("Ошибка сети при сохранении профиля.");
-    } finally {
-      setSaving(false);
-    }
-  };
+  const referrerProfileCompleted = Boolean(
+    savedReferrer
+    && savedReferrer.companies.length > 0
+    && savedReferrer.roles.length > 0,
+  );
 
   return (
     <div className="min-h-screen bg-[#F7FAFC]">
@@ -171,7 +280,7 @@ export default function ReferrerClient({ viewer }: { viewer: Viewer }) {
             Стать реферером
           </h1>
           <p className="text-[#718096] text-sm mb-8">
-            Заполни короткий профиль: укажи компании, в которые можешь порефералить, и направление, по которому хорошо понимаешь кандидатов.
+            Заполни короткий профиль: укажи компании, в которые можешь порефералить, и направление, по которому хорошо понимаешь кандидатов. Профиль сохраняется автоматически.
           </p>
 
           {!isSignedIn ? (
@@ -192,12 +301,6 @@ export default function ReferrerClient({ viewer }: { viewer: Viewer }) {
                 </Link>
               </div>
             </div>
-          ) : done ? (
-            <div className="text-center py-6">
-              <div className="text-4xl mb-3">🎉</div>
-              <p className="font-bold text-[#171923] text-lg">Готово, {displayName}!</p>
-              <p className="text-sm text-[#718096] mt-1">Переходим в профиль...</p>
-            </div>
           ) : (
             <div>
               <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-100">
@@ -206,12 +309,6 @@ export default function ReferrerClient({ viewer }: { viewer: Viewer }) {
                 </div>
                 <p className="text-sm font-medium text-[#171923]">{displayName}</p>
               </div>
-
-              {error && (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-                  {error}
-                </div>
-              )}
 
               <div className="mb-5">
                 <label className="block text-sm font-medium text-[#4A5568] mb-1.5">
@@ -314,13 +411,31 @@ export default function ReferrerClient({ viewer }: { viewer: Viewer }) {
                 </div>
               </div>
 
-              <button
-                onClick={handleSave}
-                disabled={!form.companies.length || !form.roles.length || saving}
-                className="w-full bg-[#1863e5] text-white font-semibold py-3 rounded-xl hover:bg-[#1550c0] transition-colors disabled:opacity-50"
-              >
-                {saving ? "Сохраняю..." : "Сохранить и перейти в профиль →"}
-              </button>
+              <div className="rounded-2xl border border-gray-200 bg-[#F7FAFC] p-4">
+                <p className={`text-sm font-medium ${buildDraftStatusTone(draftState)}`}>
+                  {buildDraftStatusLabel(draftState)}
+                </p>
+                {referrerProfileCompleted ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      href="/profile"
+                      className="rounded-xl bg-[#1863e5] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1550c0]"
+                    >
+                      Перейти в профиль →
+                    </Link>
+                    <Link
+                      href="/referrer/candidates"
+                      className="rounded-xl border border-[#C3DAFE] bg-white px-4 py-2.5 text-sm font-semibold text-[#1863e5] transition-colors hover:bg-[#EBF4FF]"
+                    >
+                      Открыть кандидатов
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-[#718096]">
+                    Как только компании и роли будут заполнены, профиль станет готов к работе.
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>
