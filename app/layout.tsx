@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ru">
-      <body className={`${interTight.variable} ${dmSans.variable} antialiased`} style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}>
+      <head>
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(m,e,t,r,i,k,a){
@@ -46,12 +46,25 @@ ym(107181480, 'init', {
   url: location.href,
   accurateTrackBounce: true,
   trackLinks: true
+});
+ym(108347295, 'init', {
+  ssr: true,
+  webvisor: true,
+  clickmap: true,
+  ecommerce: 'dataLayer',
+  referrer: document.referrer,
+  url: location.href,
+  accurateTrackBounce: true,
+  trackLinks: true
 });`,
           }}
         />
+      </head>
+      <body className={`${interTight.variable} ${dmSans.variable} antialiased`} style={{ fontFamily: "var(--font-dm-sans), sans-serif" }}>
         <noscript>
           <div>
             <img src="https://mc.yandex.ru/watch/107181480" style={{ position: "absolute", left: "-9999px" }} alt="" />
+            <img src="https://mc.yandex.ru/watch/108347295" style={{ position: "absolute", left: "-9999px" }} alt="" />
           </div>
         </noscript>
         <Navbar />
