@@ -3,17 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { authClient } from "@/lib/auth-client";
+import { authClient, useAuthViewer } from "@/lib/auth-client";
 import Button from "@/components/ui/Button";
 
-type Viewer = {
-  name?: string | null;
-  email?: string | null;
-} | null;
-
-export default function NavbarClient({ viewer }: { viewer: Viewer }) {
+export default function NavbarClient() {
   const pathname = usePathname();
-  const isSignedIn = Boolean(viewer?.email);
+  const { viewer, isSignedIn } = useAuthViewer();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const displayInitial = viewer?.name?.[0]?.toUpperCase() || viewer?.email?.[0]?.toUpperCase() || "U";

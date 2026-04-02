@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useAuthViewer } from "@/lib/auth-client";
 
 interface StubVacancy {
   id: string;
@@ -15,11 +16,6 @@ interface StubVacancy {
   tags: string[];
   postedLabel: string;
 }
-
-type Viewer = {
-  name?: string | null;
-  email?: string | null;
-} | null;
 
 const STUB_VACANCIES: StubVacancy[] = [
   {
@@ -90,8 +86,8 @@ const LEVEL_COLORS: Record<string, string> = {
 
 type ModalState = null | "auth" | "need-profile" | "payment" | "success";
 
-export default function ForYouClient({ viewer }: { viewer: Viewer }) {
-  const isSignedIn = Boolean(viewer?.email);
+export default function ForYouClient() {
+  const { viewer, isSignedIn } = useAuthViewer();
   const [modal, setModal] = useState<ModalState>(null);
   const [selectedVacancy, setSelectedVacancy] = useState<StubVacancy | null>(null);
   const [hasProfile, setHasProfile] = useState(false);

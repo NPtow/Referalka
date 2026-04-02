@@ -5,15 +5,12 @@ import ForWhom from "@/components/sections/ForWhom";
 import Testimonials from "@/components/sections/Testimonials";
 import FAQ from "@/components/sections/FAQ";
 import Footer from "@/components/sections/Footer";
-import { getBetterAuthSession } from "@/lib/auth-session";
 
-export default async function Home() {
-  const session = await getBetterAuthSession();
-
+export default function Home() {
   return (
     <>
       <main>
-        <Hero isSignedIn={Boolean(session?.user.email)} />
+        <Hero />
         <CompaniesStrip />
         <HowItWorks />
         <ForWhom />

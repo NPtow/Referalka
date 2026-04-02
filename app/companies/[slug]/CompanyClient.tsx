@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { COMPANIES_META } from "@/lib/constants";
 import VacancyCard from "@/components/ui/VacancyCard";
+import { useAuthViewer } from "@/lib/auth-client";
 
 interface Vacancy {
   id: string;
@@ -16,11 +17,6 @@ interface Vacancy {
   salary?: string | null;
 }
 
-type Viewer = {
-  name?: string | null;
-  email?: string | null;
-} | null;
-
 const TYPE_FILTER = ["Все", "remote", "office", "hybrid"];
 const LEVEL_FILTER = ["Все", "junior", "middle", "senior"];
 const TYPE_LABELS: Record<string, string> = { remote: "Удалённо", office: "Офис", hybrid: "Гибрид" };
@@ -28,9 +24,9 @@ const LEVEL_LABELS: Record<string, string> = { junior: "Junior", middle: "Middle
 
 type ModalState = null | "auth" | "payment" | "success" | "referral-sent" | "need-profile";
 
-export default function CompanyClient({ slug, viewer }: { slug: string; viewer: Viewer }) {
+export default function CompanyClient({ slug }: { slug: string }) {
   const company = COMPANIES_META.find((c) => c.slug === slug);
-  const isSignedIn = Boolean(viewer?.email);
+  const { isSignedIn } = useAuthViewer();
 
   const [vacancies, setVacancies] = useState<Vacancy[]>([]);
   const [loading, setLoading] = useState(true);

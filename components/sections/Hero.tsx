@@ -1,7 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import Button from "@/components/ui/Button";
+import { useAuthViewer } from "@/lib/auth-client";
 
-export default function Hero({ isSignedIn }: { isSignedIn: boolean }) {
+export default function Hero() {
+  const { isSignedIn } = useAuthViewer();
+
   return (
     <section className="bg-[#F7FAFC] flex flex-col items-center justify-center px-4 pt-28 pb-20 text-center relative overflow-hidden">
       <h1

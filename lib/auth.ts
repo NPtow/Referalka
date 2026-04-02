@@ -3,9 +3,17 @@ import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { nextCookies } from "better-auth/next-js";
 import { prisma } from "@/lib/prisma";
 
+function getConfiguredBaseURLs(): string[] {
+  return unique([
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.BETTER_AUTH_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
+  ]);
+}
+
 function getFallbackBaseURL(): string {
-  if (process.env.BETTER_AUTH_URL) return process.env.BETTER_AUTH_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  const configured = getConfiguredBaseURLs();
+  if (configured.length > 0) return configured[0];
   return "http://localhost:3000";
 }
 
@@ -14,18 +22,19 @@ function unique(values: Array<string | undefined | null>): string[] {
 }
 
 function getAllowedHosts(): string[] {
-  const fallback = getFallbackBaseURL();
-  const fallbackHost = fallback ? new URL(fallback).host : undefined;
-  const apexHost = fallbackHost?.startsWith("www.") ? fallbackHost.slice(4) : fallbackHost;
-  const wwwHost = apexHost ? `www.${apexHost}` : undefined;
+  const configuredHosts = getConfiguredBaseURLs().flatMap((value) => {
+    const host = new URL(value).host;
+    const apexHost = host.startsWith("www.") ? host.slice(4) : host;
+    const wwwHost = `www.${apexHost}`;
+
+    return [host, apexHost, wwwHost];
+  });
 
   return unique([
     "localhost:3000",
     "127.0.0.1:3000",
     "*.vercel.app",
-    fallbackHost,
-    apexHost,
-    wwwHost,
+    ...configuredHosts,
   ]);
 }
 

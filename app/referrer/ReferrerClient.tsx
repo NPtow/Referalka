@@ -4,11 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { COMPANIES_META, ROLES } from "@/lib/constants";
 import CompanyPicker from "@/components/ui/CompanyPicker";
-
-type Viewer = {
-  name?: string | null;
-  email?: string | null;
-} | null;
+import { useAuthViewer } from "@/lib/auth-client";
 
 type ReferrerData = {
   company: string | null;
@@ -80,8 +76,8 @@ function buildDraftStatusTone(state: DraftSaveState): string {
   return "text-[#718096]";
 }
 
-export default function ReferrerClient({ viewer }: { viewer: Viewer }) {
-  const isSignedIn = Boolean(viewer?.email);
+export default function ReferrerClient() {
+  const { viewer, isSignedIn } = useAuthViewer();
 
   const [form, setForm] = useState<ReferrerFormState>(() => createInitialReferrerForm());
   const [savedReferrer, setSavedReferrer] = useState<ReferrerData | null>(null);
