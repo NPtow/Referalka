@@ -1,40 +1,58 @@
 "use client";
+
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { COMPANIES_META } from "@/lib/constants";
-
-function faviconUrl(domain: string) {
-  return `https://t1.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://${domain}&size=128`;
-}
+import {
+  ScrollVelocityContainer,
+  ScrollVelocityRow,
+} from "@/components/ui/scroll-based-velocity";
 
 export default function CompaniesStrip() {
-  const doubled = [...COMPANIES_META, ...COMPANIES_META];
   const router = useRouter();
 
   return (
-    <section className="bg-[#F7FAFC] border-b border-gray-100 py-12 overflow-hidden">
+    <section className="relative overflow-hidden border-b border-gray-100 bg-[#F7FAFC] py-12">
       <p className="text-center text-xs text-[#4A5568] mb-9 tracking-widest uppercase font-semibold px-4">
         Рефералы в топовые компании России
       </p>
-      <div className="flex gap-10 animate-marquee whitespace-nowrap">
-        {doubled.map((c, i) => (
-          <button
-            key={i}
-            className="inline-flex flex-col items-center gap-2.5 min-w-[86px] cursor-pointer group"
-            onClick={() => router.push("/profile")}
+      <div className="relative">
+        <ScrollVelocityContainer className="w-full">
+          <ScrollVelocityRow
+            baseVelocity={10}
+            direction={1}
+            scrollReactivity
+            className="gap-4 px-2 py-1 sm:gap-6 sm:px-3"
           >
-            <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 shadow-sm flex items-center justify-center overflow-hidden group-hover:border-[#1863e5] group-hover:shadow-md transition-all">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={faviconUrl(c.domain)}
-                alt={c.name}
-                width={36}
-                height={36}
-                className="object-contain"
-              />
-            </div>
-            <span className="text-xs text-[#4A5568] group-hover:text-[#1863e5] transition-colors">{c.name}</span>
-          </button>
-        ))}
+            {COMPANIES_META.map((company) => (
+              <button
+                key={company.slug}
+                type="button"
+                aria-label={company.name}
+                className="group inline-flex shrink-0 cursor-pointer items-center justify-center rounded-2xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-[#1863e5] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1863e5] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7FAFC] md:p-3.5"
+                onClick={() => router.push("/profile")}
+              >
+                <div className="flex size-12 items-center justify-center overflow-hidden md:size-14">
+                  {company.logoPath ? (
+                    <Image
+                      src={company.logoPath}
+                      alt={company.name}
+                      width={40}
+                      height={40}
+                      className="max-h-8 w-auto object-contain md:max-h-10"
+                    />
+                  ) : (
+                    <span className="text-lg font-bold text-[#1863e5]">
+                      {company.name[0]}
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </ScrollVelocityRow>
+        </ScrollVelocityContainer>
+        <div className="from-background pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r via-[#F7FAFC]/90 to-transparent sm:w-28" />
+        <div className="from-background pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l via-[#F7FAFC]/90 to-transparent sm:w-28" />
       </div>
     </section>
   );
