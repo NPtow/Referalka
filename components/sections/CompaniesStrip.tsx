@@ -19,7 +19,7 @@ export default function CompaniesStrip() {
       <div className="relative">
         <ScrollVelocityContainer className="w-full">
           <ScrollVelocityRow
-            baseVelocity={10}
+            baseVelocity={1}
             direction={1}
             scrollReactivity
             className="gap-4 px-2 py-1 sm:gap-6 sm:px-3"
